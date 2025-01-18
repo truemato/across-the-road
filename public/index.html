@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>リアルタイムセンサー表示</title>
+  <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    p {
+      font-size: 1.5em;
+    }
+  </style>
+</head>
+<body>
+  <h1>リアルタイムセンサー値</h1>
+  <p>現在の値: <span id="current-value">0</span></p>
+  <p>合計値: <span id="total-value">0</span></p>
+
+  <script>
+    const socket = io('http://localhost:4000'); // サーバーアドレス
+
+    // サーバーからデータを受信して表示
+    socket.on('sensorData', (data) => {
+      document.getElementById('current-value').textContent = data.value;
+      document.getElementById('total-value').textContent = data.total;
+    });
+  </script>
+</body>
+</html>
