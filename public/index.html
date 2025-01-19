@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>リアルタイムセンサー表示</title>
+  <title>リアルタイムセンサー値</title>
   <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
   <style>
     body {
@@ -25,12 +25,12 @@
   <p>合計値: <span id="total-value">0</span></p>
 
   <script>
-    const socket = io('http://localhost:4000'); // サーバーアドレス
+    const socket = io("http://localhost:4000"); // サーバーのアドレス
 
     // サーバーからデータを受信して表示
-    socket.on('sensorData', (data) => {
-      document.getElementById('current-value').textContent = data.value;
-      document.getElementById('total-value').textContent = data.total;
+    socket.on("sensorData", (data) => {
+      document.getElementById("current-value").textContent = data.value;
+      document.getElementById("total-value").textContent = data.total;
     });
   </script>
 </body>
