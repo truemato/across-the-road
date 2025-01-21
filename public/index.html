@@ -1,85 +1,148 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>リアルタイムセンサー値</title>
+  <title>細道</title>
   <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAQEIB7oCuYiffOAveLdbajrAbipXBnJMw"></script>
   <style>
-    #map {
-      width: 100%;
-      height: 60vh;
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      overflow: hidden;
     }
     #street-view {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
-      height: 40vh;
+      height: 100vh;
+      z-index: 1;
     }
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
+    #map {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      width: 30%;
+      height: 30vh;
+      border-radius: 15px;
+      background: rgba(255, 255, 255, 0.9);
+      z-index: 2;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
-    h1, p {
-      text-align: center;
+    #current-log {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 20px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      z-index: 2;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    #input {
+      position: absolute;
+      left: 50%;
+      bottom: 20px;
+      transform: translateX(-50%);
+      width: 30%;
+      height: 40px;
+      border-radius: 8px;
+      padding: 10px 15px;
+      border: none;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      z-index: 2;
+    }
+    #input-log {
+      position: absolute;
+      right: 20px;
+      top: 20px;
+      width: 20%;
+      max-height: 80vh;
+      overflow-y: auto;
+      border-radius: 8px;
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.9);
+      z-index: 2;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    #input-log::-webkit-scrollbar {
+      width: 6px;
+    }
+    #input-log::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+    #input-log::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
     }
   </style>
 </head>
 <body>
-  <h1>Google Maps Navigation</h1>
-  <p>現在の値: <span id="current-value">0</span></p>
-  <p>合計値: <span id="total-value">0</span></p>
-
-  <div id="map"></div>
   <div id="street-view"></div>
+  <div id="map"></div>
+  <div id="current-log">Loading...</div>
+  <input id="input" placeholder="Enter a word..." />
+  <div id="input-log"></div>
 
   <script>
-    let map, streetView, currentLat = 35.6895, currentLng = 139.6917; // 初期座標: 東京
-    const socket = io("http://localhost:4000"); // サーバーのアドレス
+    let map, streetView, currentLat = 35.6895, currentLng = 139.6917;
+    const socket = io("http://localhost:4000");
 
     // Google Maps 初期化
     function initMap() {
-      // 航空写真の設定
       map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: currentLat, lng: currentLng },
         zoom: 18,
-        mapTypeId: "satellite", // 航空写真
+        mapTypeId: "satellite",
       });
 
-      // ストリートビューの設定
       streetView = new google.maps.StreetViewPanorama(
         document.getElementById("street-view"),
         {
           position: { lat: currentLat, lng: currentLng },
-          pov: { heading: 0, pitch: 0 }, // カメラの向き
+          pov: { heading: 0, pitch: 0 },
           zoom: 1,
         }
       );
 
-      // Google Maps のストリートビューをリンク
       map.setStreetView(streetView);
     }
 
-    // サーバーからリアルタイムデータを受信
     function setupSocketListeners() {
+      // 最新ログを更新
       socket.on("sensorData", (data) => {
-        console.log("Received sensor data:", data);
+        const logElement = document.getElementById("current-log");
+        logElement.textContent = `Sensor: ${data.value}, Total: ${data.total}`;
 
-        // 数値を座標に変換 (例: 0.0001度の単位で移動)
-        currentLat += data.value * 0.00001;
-        currentLng += data.value * 0.00001;
-
-        // 現在の値と合計値を更新
-        document.getElementById("current-value").textContent = data.value;
-        document.getElementById("total-value").textContent = data.total;
-
-        // 地図とストリートビューの座標を更新
-        const newPosition = { lat: currentLat, lng: currentLng };
+        const newPosition = { lat: data.lat, lng: data.lng };
         map.setCenter(newPosition);
         streetView.setPosition(newPosition);
       });
+
+      // 入力ログを更新
+      socket.on("inputLog", (log) => {
+        const logContainer = document.getElementById("input-log");
+        const logEntry = document.createElement("p");
+        logEntry.textContent = log.input;
+        logContainer.appendChild(logEntry);
+      });
     }
 
-    // ウィンドウのロード時に初期化
+    document.getElementById("input").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        const input = e.target.value;
+        e.target.value = "";
+        socket.emit("inputData", { input });
+      }
+    });
+
     window.onload = () => {
       initMap();
       setupSocketListeners();
