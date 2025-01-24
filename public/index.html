@@ -1,12 +1,13 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>細道</title>
   <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAQEIB7oCuYiffOAveLdbajrAbipXBnJMw"></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAQEIB7oCuYiffOAveLdbajrAbipXBnJMw
+  "></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     body {
       margin: 0;
@@ -14,6 +15,16 @@
       font-family: Arial, sans-serif;
       height: 100vh;
       overflow: hidden;
+    }
+
+    #threejs-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3; /* 地図より背面に配置 */
+      pointer-events: none; /* Three.jsが地図操作を邪魔しない */
     }
     #street-view {
       position: absolute;
@@ -71,29 +82,56 @@
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
-    #input-log::-webkit-scrollbar {
-      width: 6px;
-    }
-    #input-log::-webkit-scrollbar-track {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 3px;
-    }
-    #input-log::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 3px;
-    }
   </style>
 </head>
 <body>
+
   <div id="street-view"></div>
   <div id="map"></div>
   <div id="current-log">Loading...</div>
   <input id="input" placeholder="Enter a word..." />
   <div id="input-log"></div>
+    <div id="threejs-container"></div>
 
   <script>
     let map, streetView, currentLat = 35.6895, currentLng = 139.6917;
-    const socket = io("http://localhost:4000");
+
+    // Three.js 初期化
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true });
+
+    const container = document.getElementById('threejs-container');
+    let spin = 0;
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0); // 背景を透過
+    container.appendChild(renderer.domElement);
+
+    const light = new THREE.PointLight(0xffffff, 1);
+    light.position.set(10, 10, 10);
+    scene.add(light);
+
+    const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const whiteMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const group = new THREE.Group();
+
+    for (let i = 0; i < 4; i++) {
+      const geometry = new THREE.CylinderGeometry(5, 5, 2, 32, 1, false, i * Math.PI / 2, Math.PI / 2);
+      const material = i % 2 === 0 ? redMaterial : whiteMaterial;
+      const section = new THREE.Mesh(geometry, material);
+      group.add(section);
+    }
+    group.rotation.z = Math.PI / 2;
+    scene.add(group);
+    camera.position.z = 40;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      group.rotation.x -= spin * 0.001;
+      renderer.render(scene, camera);
+    }
+    animate();
 
     // Google Maps 初期化
     function initMap() {
@@ -115,18 +153,19 @@
       map.setStreetView(streetView);
     }
 
+    // Socket.IO リスナー設定
     function setupSocketListeners() {
-      // 最新ログを更新
+      const socket = io("http://localhost:4000");
+
       socket.on("sensorData", (data) => {
         const logElement = document.getElementById("current-log");
         logElement.textContent = `Sensor: ${data.value}, Total: ${data.total}`;
-
+        spin = data.value;
         const newPosition = { lat: data.lat, lng: data.lng };
         map.setCenter(newPosition);
         streetView.setPosition(newPosition);
       });
 
-      // 入力ログを更新
       socket.on("inputLog", (log) => {
         const logContainer = document.getElementById("input-log");
         const logEntry = document.createElement("p");
@@ -147,6 +186,11 @@
       initMap();
       setupSocketListeners();
     };
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   </script>
 </body>
 </html>

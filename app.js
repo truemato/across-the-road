@@ -10,8 +10,21 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // MongoDB 接続
+// サーバー起動時に MongoDB から最新の座標を取得して設定
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("Connected to MongoDB"))
+  .then(async () => {
+    console.log("Connected to MongoDB");
+
+    // 最新のセンサーデータを取得
+    const latestSensorValue = await SensorValue.findOne().sort({ timestamp: -1 });
+    if (latestSensorValue) {
+      currentLat = latestSensorValue.lat;
+      currentLng = latestSensorValue.lng;
+      console.log("Loaded latest location from DB:", { lat: currentLat, lng: currentLng });
+    } else {
+      console.log("No previous sensor data found. Using default location (Tokyo Station).");
+    }
+  })
   .catch((err) => console.error("MongoDB connection error:", err));
 
 // 入力データスキーマ
@@ -20,6 +33,9 @@ const InputSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 const InputModel = mongoose.model("Input", InputSchema);
+
+
+const InputLog = require("./models/InputLog");
 
 // クライアント接続
 io.on("connection", (socket) => {

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>細道</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #text-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1; /* Three.js の canvas より手前に表示 */
+      font-size: 24px;
+      font-family: Arial, sans-serif;
+      color: #333;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0; /* 背景として Three.js の canvas を配置 */
+    }
+  </style>
+</head>
+<body>
+    <div id="text-container">
+        背景の3Dアニメーションの後ろに配置された文章です！
+    </div>
+  <script>
+    // シーン、カメラ、レンダラーをセットアップ
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0); // 背景を透過 (透明度: 0)
+    document.body.appendChild(renderer.domElement);
+
+    // 照明の設定
+    const light = new THREE.PointLight(0xffffff, 2);
+    light.position.set(10, 10, 10);
+    scene.add(light);
+
+    // 赤と白の塗り分けマテリアルを作成
+    const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const whiteMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+
+    // ケーキ全体を生成
+    const group = new THREE.Group();
+
+    // 4つの分割セクションを作成
+    const angleStep = Math.PI / 2;
+    for (let i = 0; i < 4; i++) {
+      const geometry = new THREE.CylinderGeometry(5, 5, 2, 32, 1, false, i * angleStep, angleStep);
+      const material = 
+        i % 2 === 0 ? redMaterial : whiteMaterial;
+      const section = new THREE.Mesh(geometry, material);
+      group.add(section);
+    }
+    group.rotation.z = Math.PI / 2;
+
+    scene.add(group);
+
+    // カメラ位置を設定
+    camera.position.z = 40;
+
+    // 縦回転アニメーション
+// 縦回転アニメーション
+function animate() {
+  requestAnimationFrame(animate);
+  group.rotation.x -= 0.01; // X軸方向の回転
+  renderer.render(scene, camera);
+}
+
+
+    animate();
+
+    // ウィンドウリサイズ対応
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
