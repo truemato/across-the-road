@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const InputLogSchema = new mongoose.Schema({
+const LastPlaceSchema = new mongoose.Schema({
   lat: Number,
   lng: Number,
   placename: String,
@@ -8,4 +8,4 @@ const InputLogSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model("InputLog", InputLogSchema);
+module.exports = mongoose.model("LastPlace", LastPlaceSchema, "lastplace");

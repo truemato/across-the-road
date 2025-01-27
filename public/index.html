@@ -6,9 +6,10 @@
   <title>細道</title>
   <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAQEIB7oCuYiffOAveLdbajrAbipXBnJMw
-  "></script>
+  " async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
+
     body {
       margin: 0;
       padding: 0;
@@ -16,7 +17,6 @@
       height: 100vh;
       overflow: hidden;
     }
-
     #threejs-container {
       position: absolute;
       top: 0;
@@ -85,25 +85,43 @@
   </style>
 </head>
 <body>
-
   <div id="street-view"></div>
   <div id="map"></div>
-  <div id="current-log">Loading...</div>
+  <div id="current-log">Loading...Motor RPM: <span id="motor-rpm">0</span>Output RPM: <span id="output-rpm">0</span></div>
+  <div id="sensor-log" style="position: absolute; top: 20px; right: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);">
+    Loading...
+  </div>
   <input id="input" placeholder="Enter a word..." />
   <div id="input-log"></div>
     <div id="threejs-container"></div>
 
   <script>
-    let map, streetView, currentLat = 35.6895, currentLng = 139.6917;
-
     // Three.js 初期化
+    let spin = 10;
+    
+    let currentLat = 0;
+    let currentLng = 0;
+
+    async function fetchLastPlace() {
+      try {
+        const response = await fetch('http://localhost:4000/api/lastplace'); // APIエンドポイント
+        if (!response.ok) {
+          throw new Error('Failed to fetch last place data');
+        }
+        const data = await response.json();
+        return { lat: data[0].lat, lng: data[0].lng }; // 最新の座標を返す
+      } catch (error) {
+        console.error('Error fetching last place:', error);
+        return { lat: 35.6895, lng: 139.6917 }; // デフォルト座標 (東京)
+      }
+    }
+
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ alpha: true });
 
     const container = document.getElementById('threejs-container');
-    let spin = 0;
-
+    
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0); // 背景を透過
     container.appendChild(renderer.domElement);
@@ -132,32 +150,15 @@
       renderer.render(scene, camera);
     }
     animate();
-
-    // Google Maps 初期化
-    function initMap() {
-      map = new google.maps.Map(document.getElementById("map"), {
-        center: { lat: currentLat, lng: currentLng },
-        zoom: 18,
-        mapTypeId: "satellite",
-      });
-
-      streetView = new google.maps.StreetViewPanorama(
-        document.getElementById("street-view"),
-        {
-          position: { lat: currentLat, lng: currentLng },
-          pov: { heading: 0, pitch: 0 },
-          zoom: 1,
-        }
-      );
-
-      map.setStreetView(streetView);
-    }
-
+   
     // Socket.IO リスナー設定
+    const socket = io("http://localhost:4000"); // グローバルに定義
+    
     function setupSocketListeners() {
-      const socket = io("http://localhost:4000");
 
       socket.on("sensorData", (data) => {
+        document.getElementById("motor-rpm").textContent = data.motor_rpm.toFixed(2);
+        document.getElementById("output-rpm").textContent = data.output_rpm.toFixed(2);
         const logElement = document.getElementById("current-log");
         logElement.textContent = `Sensor: ${data.value}, Total: ${data.total}`;
         spin = data.value;
@@ -181,11 +182,37 @@
         socket.emit("inputData", { input });
       }
     });
+    async function initMap() {
+      const initialPosition = await fetchLastPlace(); // 初期座標を取得
+      
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: initialPosition,
+        zoom: 14,
+      });
 
+      marker = new google.maps.Marker({
+        position: initialPosition,
+        map: map,
+        title: "Current Position",
+      });
+      
+      streetView = new google.maps.StreetViewPanorama(
+        document.getElementById("street-view"),
+        {
+          position: initialPosition,
+          pov: { heading: 0, pitch: 0 },
+          zoom: 1,
+        }
+      );
+      map.setStreetView(streetView);
+
+     }
+     
     window.onload = () => {
       initMap();
       setupSocketListeners();
     };
+
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();

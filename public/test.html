@@ -92,6 +92,47 @@ function animate() {
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
+
+
+
+   // Socket.IO リスナー設定
+   function setupSocketListeners() {
+      const socket = io("http://localhost:4000");
+
+      socket.on("sensorData", (data) => {
+        const logElement = document.getElementById("current-log");
+        logElement.textContent = `Sensor: ${data.value}, Total: ${data.total}`;
+        spin = data.value;
+        const newPosition = { lat: data.lat, lng: data.lng };
+        map.setCenter(newPosition);
+        streetView.setPosition(newPosition);
+      });
+
+      socket.on("inputLog", (log) => {
+        const logContainer = document.getElementById("input-log");
+        const logEntry = document.createElement("p");
+        logEntry.textContent = log.input;
+        logContainer.appendChild(logEntry);
+      });
+    }
+
+    document.getElementById("input").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        const input = e.target.value;
+        e.target.value = "";
+        socket.emit("inputData", { input });
+      }
+    });
+
+    window.onload = () => {
+      initMap();
+      setupSocketListeners();
+    };
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
   </script>
 </body>
 </html>
