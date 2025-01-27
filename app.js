@@ -8,7 +8,7 @@ import { ReadlineParser } from "@serialport/parser-readline";
 import lastplace from "./models/lastplace.js";
 import haikuplace from "./models/haikuplace.js";
 import SensorValue from "./models/SensorValue.js";
-// let arduinoData = { run : 0, output_rpm: 0 };
+let arduinoData = { run : 0, output_rpm: 0 };
 
 dotenv.config();
 
@@ -84,9 +84,13 @@ parser.on('data', (data) => {
   try {
       // Arduinoから送られてきたJSONをパースして保持
       arduinoData = JSON.parse(data);
+
   } catch (err) {
       console.error('Invalid JSON:', data);
   }
+});
+app.get('/data', (req, res) => {
+  res.json(arduinoData); // 最新のArduinoデータを返す
 });
 
 app.get("/api/sensor", (req, res) => {

@@ -87,9 +87,9 @@
 <body>
   <div id="street-view"></div>
   <div id="map"></div>
-  <div id="current-log">Loading...Motor RPM: <span id="motor-rpm">0</span>Output RPM: <span id="output-rpm">0</span></div>
+  <div id="current-log">Loading...</div>
   <div id="sensor-log" style="position: absolute; top: 20px; right: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);">
-    Loading...
+    Loading...Output RPM: <span id="output-rpm">0.00</span>
   </div>
   <input id="input" placeholder="Enter a word..." />
   <div id="input-log"></div>
@@ -97,8 +97,9 @@
 
   <script>
     // Three.js 初期化
+    let runValue = 0;
+    let outputRpm = 0;
     let spin = 10;
-    
     let currentLat = 0;
     let currentLng = 0;
 
@@ -146,7 +147,10 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      group.rotation.x -= spin * 0.001;
+      group.rotation.x -= outputRpm * 0.0005;
+      // 角度 0.10472 = 円周 2100 x 3.14 = 6594
+      // output rpm 0.6 = 円周 6.7 x 3.14 = 21.038
+      // 0.10472 / 187.658 = 0.0005
       renderer.render(scene, camera);
     }
     animate();
@@ -154,7 +158,7 @@
     // Socket.IO リスナー設定
     const socket = io("http://localhost:4000"); // グローバルに定義
     
-    function setupSocketListeners() {
+    /** function setupSocketListeners() {
 
       socket.on("sensorData", (data) => {
         document.getElementById("motor-rpm").textContent = data.motor_rpm.toFixed(2);
@@ -173,7 +177,7 @@
         logEntry.textContent = log.input;
         logContainer.appendChild(logEntry);
       });
-    }
+    } */
 
     document.getElementById("input").addEventListener("keypress", (e) => {
       if (e.key === "Enter") {
@@ -207,10 +211,38 @@
       map.setStreetView(streetView);
 
      }
-     
+     async function fetchData() {
+      try {
+          const response = await fetch('http://localhost:4000/data'); // サーバーからデータを取得
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json(); // JSONに変換
+
+          // データをグローバル変数に保存
+          runValue = data.run;
+          outputRpm = data.output_rpm;
+
+      } catch (error) {
+          console.error('Error fetching data:', error);
+      }
+    }
+
+  // グローバル変数を使った例
+  function logValues() {
+      console.log(`Run Value: ${runValue}`);
+      console.log(`Output RPM: ${outputRpm}`);
+  }
+
+
+    // 1秒ごとにデータを取得
+    setInterval(fetchData, 1000);
+    setInterval(logValues, 1000);
+
     window.onload = () => {
       initMap();
-      setupSocketListeners();
+      fetchData();
+      // setupSocketListeners();
     };
 
     window.addEventListener('resize', () => {
