@@ -1,11 +1,74 @@
-require("dotenv").config();
-const mongoose = require("mongoose");
+/*
+schema.js
+Table
+
+test
+  haikuplace
+
+  inputlogs
+  inputs
+  lastplace
+  lastplaces
+  sensorvalue
+  sensorvalues
+
+**/
+
+
+
+
 const graphql = require("graphql");
 const SensorValue = require("./models/SensorValue");
-const LastPlace = require("./models/LastPlace");
-const HaikuPlace = require("./models/HaikuPlace");
-
+const HaikuPlace = require("./models/haikuplace");
 const { GraphQLObjectType, GraphQLSchema, GraphQLInt, GraphQLList, GraphQLString } = graphql;
+
+
+// GraphQLスキーマの定義
+const HaikuPlaceType = new GraphQLObjectType({
+  name: "HaikuPlace",
+  fields: {
+    lat: { type: GraphQLFloat },
+    lng: { type: GraphQLFloat },
+    placename: { type: GraphQLString },
+    comment: { type: GraphQLString },
+    timestamp: { type: Date, default: Date.now },
+  },
+});
+
+const RootQuery = new GraphQLObjectType({
+  name: "RootQuery",
+  fields: {
+    getLatestPlace: {
+      type: HaikuPlaceType,
+      resolve: async () => {
+        return await HaikuPlace.findOne().sort({ timestamp: -1 });
+      },
+    },
+  },
+});
+
+const Mutation = new GraphQLObjectType({
+  name: "Mutation",
+  fields: {
+    addLocation: {
+      type: HaikuPlaceType,
+      args: {
+        lat: { type: GraphQLFloat },
+        lng: { type: GraphQLFloat },
+        placename: { type: GraphQLString },
+      },
+      resolve: async (_, { lat, lng, placename }) => {
+        const newPlace = new HaikuPlace({ lat, lng, placename, timestamp: new Date() });
+        return await newPlace.save();
+      },
+    },
+  },
+});
+
+module.exports = new GraphQLSchema({
+  query: RootQuery,
+  mutation: Mutation,
+});
 
 // センサー値タイプ
 const SensorValueType = new GraphQLObjectType({
@@ -17,51 +80,6 @@ const SensorValueType = new GraphQLObjectType({
     timestamp: { type: GraphQLString },
   }),
 });
-
-// LastPlaceの取得関数
-async function fetchLastPlace() {
-  try {
-    await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
-
-    const lastPlace = await LastPlace.findOne().sort({ timestamp: -1 });
-    console.log("Last Place:", lastPlace);
-
-    return lastPlace;
-  } catch (error) {
-    console.error("Error fetching last place:", error);
-  } finally {
-    mongoose.connection.close();
-  }
-}
-
-// HaikuPlaceの挿入関数
-async function insertHaikuPlace() {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-
-    const newHaiku = new HaikuPlace({
-      lat: 35.6586,
-      lng: 139.7454,
-      placename: "東京タワー",
-      comment: "空風に合わぬ半袖赤いタワー",
-      timestamp: new Date("2025-01-18T14:29:58.474+00:00"),
-    });
-
-    const savedHaiku = await newHaiku.save();
-    console.log("HaikuPlace saved:", savedHaiku);
-  } catch (error) {
-    console.error("Error inserting haiku place:", error);
-  } finally {
-    mongoose.connection.close();
-  }
-}
-
-// 実行
-insertHaikuPlace();
-fetchLastPlace();
 
 module.exports = new GraphQLSchema({
   query: RootQuery,

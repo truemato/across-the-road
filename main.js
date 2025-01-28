@@ -1,3 +1,5 @@
+// main.js
+
 import { createRoot } from "react-dom/client";
 import React from "react";
 import { Canvas } from "@react-three/fiber";

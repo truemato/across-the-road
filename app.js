@@ -1,3 +1,5 @@
+//app.js
+
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
@@ -7,7 +9,6 @@ import { SerialPort } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
 import lastplace from "./models/lastplace.js";
 import haikuplace from "./models/haikuplace.js";
-import SensorValue from "./models/SensorValue.js";
 let arduinoData = { run : 0, output_rpm: 0 };
 
 dotenv.config();
@@ -23,7 +24,6 @@ app.use(express.static('public'));
 let currentLat = 0;
 let currentLng = 0;
 let totalValue = 0; // センサーの合計値を管理する変数
-let currentValue = 0; // センサーの合計値を管理する変数
 
 const portName = "COM5"; // Arduino が接続されているポートに変更
 const baudRate = 9600;   // Arduino の通信速度に合わせる
@@ -59,26 +59,35 @@ async function fetchLastPlace() {
   }
 }
 
-// HaikuPlaceの挿入関数
-async function insertHaikuPlace() {
+process.stdin.setEncoding("utf-8");
+process.stdin.on("data", async (line) => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    const newHaiku = new haikuplace({
-      lat: 35.6586,
-      lng: 139.7454,
-      placename: "東京タワー",
-      comment: "空風に合わぬ半袖赤いタワー",
-      timestamp: new Date("2025-01-18T14:29:58.474+00:00"),
-    });
+    const location = JSON.parse(line.trim());
+    const { lat, lng, placename } = location;
 
-    const savedHaiku = await newHaiku.save();
-    console.log("HaikuPlace saved:", savedHaiku);
+    // クライアントに送信
+    io.emit("locationUpdate", { lat, lng, placename, comment });
+
+    // DBに保存
+    const newPlace = new HaikuPlace({ lat, lng, placename,comment ,  timestamp: new Date() });
+    await newPlace.save();
+    console.log("Location saved:", newPlace);
   } catch (error) {
-    console.error("Error inserting haiku place:", error);
-  } finally {
-    mongoose.connection.close();
+    console.error("Error processing input:", error.message);
   }
-}
+});
+
+// APIエンドポイント
+app.post("/api/update-location", async (req, res) => {
+  const { lat, lng, placename } = req.body;
+  try {
+    const newPlace = new HaikuPlace({ lat, lng, placename, comment , timestamp: new Date() });
+    await newPlace.save();
+    res.json(newPlace);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 parser.on('data', (data) => {
   try {
@@ -107,8 +116,8 @@ app.get('/api/haikuplace', async (req, res) => {
 
 app.post('/api/haikuplace', async (req, res) => {
   try {
-    const { lat, lng, placename, haiku } = req.body;
-    const newHaiku = new haikuplace({ lat, lng, placename, haiku });
+    const { lat, lng, placename, comment } = req.body; 
+    const newHaiku = new haikuplace({ lat, lng, placename, comment }); // commentを保存
     await newHaiku.save();
     res.status(201).json(newHaiku);
   } catch (err) {
@@ -127,13 +136,26 @@ app.get('/api/lastplace', async (req, res) => {
 
 app.post('/api/lastplace', async (req, res) => {
   try {
-    const { lat, lng, placename, haiku } = req.body;
-    const newHaiku = new lastplace({ lat, lng, placename, haiku });
+    const { lat, lng, placename, comment  } = req.body;
+    const newHaiku = new lastplace({ lat, lng, placename, comment });
     await newHaiku.save();
     res.status(201).json(newHaiku);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+io.on("connection", (socket) => {
+  console.log("Client connected");
+
+  // クライアントからのデータを受信
+  socket.on("locationUpdate", (data) => {
+    console.log(`Received location: ${JSON.stringify(data)}`); // ターミナルに出力
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Client disconnected");
+  });
 });
 
 server.listen(4000, () => {

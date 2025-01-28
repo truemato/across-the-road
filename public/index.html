@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +9,8 @@
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAQEIB7oCuYiffOAveLdbajrAbipXBnJMw
   " async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="/main.js"></script>
+
   <style>
 
     body {
@@ -89,7 +92,7 @@
   <div id="map"></div>
   <div id="current-log">Loading...</div>
   <div id="sensor-log" style="position: absolute; top: 20px; right: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);">
-    Loading...Output RPM: <span id="output-rpm">0.00</span>
+    Loading...
   </div>
   <input id="input" placeholder="Enter a word..." />
   <div id="input-log"></div>
@@ -100,6 +103,7 @@
     let runValue = 0;
     let outputRpm = 0;
     let spin = 10;
+    let distance_cm = 0;
     let currentLat = 0;
     let currentLng = 0;
 
@@ -147,14 +151,21 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      group.rotation.x -= outputRpm * 0.0005;
-      // 角度 0.10472 = 円周 2100 x 3.14 = 6594
-      // output rpm 0.6 = 円周 6.7 x 3.14 = 21.038
-      // 0.10472 / 187.658 = 0.0005
+      group.rotation.x -= outputRpm * 0.0033;
+      // ラジアン角度 0.10472 60分の1秒 = 円周 210 x 3.14 = 659.4 cm
+      // rpm 0.6 = 円周 6.7 x 3.14 = 21.038 cm
+      // モーター31.343周 = 大車輪の1周 = 18.80597 rpm
+      // 0.10472 / 187.658 = 0.0033
+      // 1 rpm = 35.06333 cm
+      // 
+      // 659.4cm 北東への移動 = 65.94m * cos45° = 65.94m * 0.7071 ≒ 46.67m
+      // 北東に 6594 cm 進んだ時、緯度は約0.00042度増加し、経度は約0.00051度増加
+      distance_cm = outputRpm * 35.06
       renderer.render(scene, camera);
     }
     animate();
-   
+    
+    
     // Socket.IO リスナー設定
     const socket = io("http://localhost:4000"); // グローバルに定義
     
@@ -179,13 +190,53 @@
       });
     } */
 
-    document.getElementById("input").addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        const input = e.target.value;
-        e.target.value = "";
-        socket.emit("inputData", { input });
+    document.getElementById("input").addEventListener("keypress", async (e) => {
+  if (e.key === "Enter") {
+     // 入力値を先に取得
+    const comment = e.target.value.trim();
+
+     // 入力欄をクリア
+    e.target.value = "";
+
+    // 今まで socket.emit("inputData", { input }) を呼んでいましたが、
+    // 変数 input が定義されていないので、もし使うなら comment を送るなどに修正が必要
+
+     // もし socket にも送信したいなら:
+     socket.emit("inputData", { input: comment });
+
+    // 地図の現在中心座標を取得（StreetView ではなく Map の中心を使用する例）
+    const center = map.getCenter();
+    const lat = center.lat();
+    const lng = center.lng();
+
+    // placename は一旦空や任意の文字を入れておく（必要に応じて実装）
+    const placename = "";
+
+    // HaikuPlaceテーブル（MongoDB）に POST
+    try {
+      const response = await fetch("/api/haikuplace", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          lat,
+          lng,
+          placename,
+          comment,  // 先ほど取得した入力値を送る
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
       }
-    });
+      const data = await response.json();
+      console.log("Posted to HaikuPlace:", data);
+    } catch (error) {
+      console.error("Error posting comment to HaikuPlace:", error);
+    }
+  }
+});
+
     async function initMap() {
       const initialPosition = await fetchLastPlace(); // 初期座標を取得
       
@@ -232,8 +283,9 @@
   function logValues() {
       console.log(`Run Value: ${runValue}`);
       console.log(`Output RPM: ${outputRpm}`);
+      console.log(`currentLat: ${currentLat}`);
+      console.log(`currentLng: ${currentLng}`);
   }
-
 
     // 1秒ごとにデータを取得
     setInterval(fetchData, 1000);
