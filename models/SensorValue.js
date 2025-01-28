@@ -1,13 +1,13 @@
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
 
-const sensorValueSchema = new Schema({
-  run: Number, // センサーの現在の値
-  output_rpm: Number, // 合計値
-  lat: Number, // 緯度
-  lng: Number, // 経度
-  timestamp: { type: Date, default: Date.now }, // 保存時刻
+const SensorValueSchema = new mongoose.Schema({
+  value: Number,          // 例: センサー生値や runValue
+  total: Number,          // 例: 累計など
+  lat: Number,            // 追記
+  lng: Number,            // 追記
+  updateCount: Number,    // 追記：更新回数
+  totalDistance: Number,  // 追記：総移動距離 (cm or mなど)
+  timestamp: { type: Date, default: Date.now },
 });
 
-
-module.exports = mongoose.model("SensorValue", sensorValueSchema,"sensorvalue");
+module.exports = mongoose.model("SensorValue", SensorValueSchema, "sensorvalue");

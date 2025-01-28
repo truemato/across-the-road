@@ -15,11 +15,9 @@ test
 **/
 
 
-
-
-const graphql = require("graphql");
-const SensorValue = require("./models/SensorValue");
-const HaikuPlace = require("./models/haikuplace");
+import graphql from "graphql";
+import SensorValue from "./models/sensorvalue.js";
+import HaikuPlace from "./models/haikuplace.js";
 const { GraphQLObjectType, GraphQLSchema, GraphQLInt, GraphQLList, GraphQLString } = graphql;
 
 
@@ -33,6 +31,20 @@ const HaikuPlaceType = new GraphQLObjectType({
     comment: { type: GraphQLString },
     timestamp: { type: Date, default: Date.now },
   },
+});
+
+const SensorValueType = new GraphQLObjectType({
+  name: "SensorValue",
+  fields: () => ({
+    id: { type: GraphQLString },
+    value: { type: GraphQLInt },
+    total: { type: GraphQLInt },
+    lat: { type: GraphQLFloat },
+    lng: { type: GraphQLFloat },
+    updateCount: { type: graphql.GraphQLInt },
+    totalDistance: { type: GraphQLFloat },
+    timestamp: { type: GraphQLString },
+  }),
 });
 
 const RootQuery = new GraphQLObjectType({
@@ -71,16 +83,5 @@ module.exports = new GraphQLSchema({
 });
 
 // センサー値タイプ
-const SensorValueType = new GraphQLObjectType({
-  name: "SensorValue",
-  fields: () => ({
-    id: { type: GraphQLString },
-    value: { type: GraphQLInt },
-    total: { type: GraphQLInt },
-    timestamp: { type: GraphQLString },
-  }),
-});
 
-module.exports = new GraphQLSchema({
-  query: RootQuery,
-});
+

@@ -9,6 +9,7 @@ import { SerialPort } from "serialport";
 import { ReadlineParser } from "@serialport/parser-readline";
 import lastplace from "./models/lastplace.js";
 import haikuplace from "./models/haikuplace.js";
+import sensorvalue from "./models/sensorvalue.js"
 let arduinoData = { run : 0, output_rpm: 0 };
 
 dotenv.config();
@@ -23,7 +24,6 @@ app.use(express.static('public'));
 
 let currentLat = 0;
 let currentLng = 0;
-let totalValue = 0; // センサーの合計値を管理する変数
 
 const portName = "COM5"; // Arduino が接続されているポートに変更
 const baudRate = 9600;   // Arduino の通信速度に合わせる
@@ -102,9 +102,46 @@ app.get('/data', (req, res) => {
   res.json(arduinoData); // 最新のArduinoデータを返す
 });
 
-app.get("/api/sensor", (req, res) => {
-  res.json(currentValue);
-});
+app.post("/api/sensorvalue", async (req, res) => {
+    try {
+      // クライアントから送られるデータの例
+      // { value: 123, total: 200, lat: 34.987, lng: 135.757, updateCount: 4, totalDistance: 1200 }
+      const { value, total, lat, lng, updateCount, totalDistance } = req.body;
+  
+      // 新規ドキュメント作成
+      const newSensorValue = new sensorvalue({
+        value,
+        total,
+        lat,
+        lng,
+        updateCount,
+        totalDistance,
+        timestamp: new Date()
+      });
+  
+      // DBに保存
+      await newSensorValue.save();
+  
+      // レスポンスとして返却
+      res.status(201).json(newSensorValue);
+  
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+  app.get("/api/sensorvalue", async (req, res) => {
+       try {
+        // 例: 全データを取得し、timestampの降順で返す
+        const sensorValues = await sensorvalue.find().sort({ timestamp: -1 });
+    
+         // もしくは最新1件だけ返したいなら:
+         // const sensorValues = await SensorValue.findOne().sort({ timestamp: -1 });
+    
+        res.json(sensorValues);
+       } catch (err) {
+         res.status(500).json({ error: err.message });
+       }
+    });
 app.get('/api/haikuplace', async (req, res) => {
   try {
     const haikus = await haikuplace.find().sort({ timestamp: -1 });
@@ -114,10 +151,40 @@ app.get('/api/haikuplace', async (req, res) => {
   }
 });
 
-app.post('/api/haikuplace', async (req, res) => {
+
+app.post("/api/haikuplace", async (req, res) => {
   try {
-    const { lat, lng, placename, comment } = req.body; 
-    const newHaiku = new haikuplace({ lat, lng, placename, comment }); // commentを保存
+    let { lat, lng, placename, comment } = req.body;
+
+    // placename が無い (または空文字) 場合だけ逆ジオコーディングする
+    if (!placename || placename.trim() === "") {
+      const apiKey = process.env.GOOGLE_MAP_API_KEY;
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}`;
+
+      const response = await fetch(geocodeUrl);
+      const data = await response.json();
+
+      if (
+        data.results && 
+        data.results.length > 0 && 
+        data.results[0].formatted_address
+      ) {
+        // APIが返す住所文字列を placename に代入
+        placename = data.results[0].formatted_address;
+      } else {
+        placename = ""; // 取得できなかったら空文字にしておく
+      }
+    }
+
+    // HaikuPlace に新規挿入
+    const newHaiku = new haikuplace({
+      lat,
+      lng,
+      placename,
+      comment,
+      timestamp: new Date(),
+    });
+
     await newHaiku.save();
     res.status(201).json(newHaiku);
   } catch (err) {

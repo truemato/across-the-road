@@ -104,22 +104,13 @@
     let outputRpm = 0;
     let spin = 10;
     let distance_cm = 0;
-    let currentLat = 0;
-    let currentLng = 0;
-
-    async function fetchLastPlace() {
-      try {
-        const response = await fetch('http://localhost:4000/api/lastplace'); // APIエンドポイント
-        if (!response.ok) {
-          throw new Error('Failed to fetch last place data');
-        }
-        const data = await response.json();
-        return { lat: data[0].lat, lng: data[0].lng }; // 最新の座標を返す
-      } catch (error) {
-        console.error('Error fetching last place:', error);
-        return { lat: 35.6895, lng: 139.6917 }; // デフォルト座標 (東京)
-      }
-    }
+    let currentLat = 34.9862105;
+    let currentLng = 135.7662586;
+    let accumulatedDistance = 0; // 今回のステップごとに貯まる距離(cm)
+    let totalDistance = 0;       // セッション内の総距離(cm)
+    let updateCount = 0;         // 緯度経度を更新した回数
+    // 1rpm = 35.06 cm/秒（仮定）
+    // 659.4 cm 移動ごとに lat +0.00042, lng +0.00051
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -151,7 +142,7 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      group.rotation.x -= outputRpm * 0.0033;
+      group.rotation.x -= outputRpm * 0.33;
       // ラジアン角度 0.10472 60分の1秒 = 円周 210 x 3.14 = 659.4 cm
       // rpm 0.6 = 円周 6.7 x 3.14 = 21.038 cm
       // モーター31.343周 = 大車輪の1周 = 18.80597 rpm
@@ -169,27 +160,20 @@
     // Socket.IO リスナー設定
     const socket = io("http://localhost:4000"); // グローバルに定義
     
-    /** function setupSocketListeners() {
 
-      socket.on("sensorData", (data) => {
-        document.getElementById("motor-rpm").textContent = data.motor_rpm.toFixed(2);
-        document.getElementById("output-rpm").textContent = data.output_rpm.toFixed(2);
-        const logElement = document.getElementById("current-log");
-        logElement.textContent = `Sensor: ${data.value}, Total: ${data.total}`;
-        spin = data.value;
-        const newPosition = { lat: data.lat, lng: data.lng };
-        map.setCenter(newPosition);
-        streetView.setPosition(newPosition);
-      });
-
-      socket.on("inputLog", (log) => {
-        const logContainer = document.getElementById("input-log");
-        const logEntry = document.createElement("p");
-        logEntry.textContent = log.input;
-        logContainer.appendChild(logEntry);
-      });
-    } */
-
+    async function fetchLastPlace() {
+      try {
+        const response = await fetch('http://localhost:4000/api/lastplace'); // APIエンドポイント
+        if (!response.ok) {
+          throw new Error('Failed to fetch last place data');
+        }
+        const data = await response.json();
+        return { lat: data[0].lat, lng: data[0].lng }; // 最新の座標を返す
+      } catch (error) {
+        console.error('Error fetching last place:', error);
+        return { lat: 35.6895, lng: 139.6917 }; // デフォルト座標 (東京)
+      }
+    }
     document.getElementById("input").addEventListener("keypress", async (e) => {
   if (e.key === "Enter") {
      // 入力値を先に取得
@@ -197,11 +181,6 @@
 
      // 入力欄をクリア
     e.target.value = "";
-
-    // 今まで socket.emit("inputData", { input }) を呼んでいましたが、
-    // 変数 input が定義されていないので、もし使うなら comment を送るなどに修正が必要
-
-     // もし socket にも送信したいなら:
      socket.emit("inputData", { input: comment });
 
     // 地図の現在中心座標を取得（StreetView ではなく Map の中心を使用する例）
@@ -237,48 +216,86 @@
   }
 });
 
-    async function initMap() {
-      const initialPosition = await fetchLastPlace(); // 初期座標を取得
-      
+      async function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
-        center: initialPosition,
-        zoom: 14,
+        center: { lat: currentLat, lng: currentLng },
+        zoom: 15,
       });
-
       marker = new google.maps.Marker({
-        position: initialPosition,
+        position: { lat: currentLat, lng: currentLng },
         map: map,
-        title: "Current Position",
       });
-      
       streetView = new google.maps.StreetViewPanorama(
         document.getElementById("street-view"),
         {
-          position: initialPosition,
+          position: { lat: currentLat, lng: currentLng },
           pov: { heading: 0, pitch: 0 },
           zoom: 1,
         }
       );
       map.setStreetView(streetView);
-
-     }
-     async function fetchData() {
+    }
+    async function fetchData() {
       try {
-          const response = await fetch('http://localhost:4000/data'); // サーバーからデータを取得
-          if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const data = await response.json(); // JSONに変換
+        const response = await fetch("http://localhost:4000/data");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        // ここで runValue/outputRpm を更新
+        runValue = data.run;
+        outputRpm = data.output_rpm;
 
-          // データをグローバル変数に保存
-          runValue = data.run;
-          outputRpm = data.output_rpm;
+        // --- 距離を計算 ---
+        // 1秒あたり outputRpm * 35.06 cm と仮定
+        const distanceToAdd = outputRpm * 35.06; 
+        accumulatedDistance += distanceToAdd;
+        totalDistance += distanceToAdd; // セッション内合計距離
+
+        // もし accumulatedDistance が 659.4cm 以上になったら、
+        // 659.4cm ごとに lat,lng を更新し、カウントを増やす
+        while (accumulatedDistance >= 659.4) {
+          currentLat += 0.00042; 
+          currentLng += 0.00051;
+          accumulatedDistance -= 659.4;
+          updateCount++;
+        }
+
+        // --- Map / StreetView の位置を更新 ---
+        const newPosition = { lat: currentLat, lng: currentLng };
+        map.setCenter(newPosition);
+        marker.setPosition(newPosition);
+        streetView.setPosition(newPosition);
+
+        // --- DBにも保存したい場合は fetchで送信 (RESTの例) ---
+        // 「センサ値 + 緯度経度など」を保存しておきたいなら:
+        const sensorValueBody = {
+          value: data.run,
+          total: data.total,
+          lat: currentLat,
+          lng: currentLng,
+          updateCount,
+          totalDistance, // cm単位で格納（必要に応じてm/km換算）
+        };
+
+        const sensorResp = await fetch("http://localhost:4000/api/sensorvalue", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sensorValueBody),
+        });
+        const savedData = await sensorResp.json();
+        console.log("SensorValue saved:", savedData);
+
+        // 画面にも表示
+        document.getElementById("current-log").textContent =
+          `RPM: ${outputRpm.toFixed(2)}, ` +
+          `Lat: ${currentLat.toFixed(6)}, Lng: ${currentLng.toFixed(6)}, ` +
+          `Update#: ${updateCount}, Distance: ${totalDistance.toFixed(2)} cm`;
 
       } catch (error) {
-          console.error('Error fetching data:', error);
+        console.error("Error fetching data:", error);
       }
     }
-
   // グローバル変数を使った例
   function logValues() {
       console.log(`Run Value: ${runValue}`);
@@ -293,7 +310,6 @@
 
     window.onload = () => {
       initMap();
-      fetchData();
       // setupSocketListeners();
     };
 
