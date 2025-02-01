@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const HaikuPlaceSchema = new mongoose.Schema({
   lat: Number,
@@ -8,4 +8,4 @@ const HaikuPlaceSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model("HaikuPlace", HaikuPlaceSchema,"haikuplace");
+export default mongoose.model("HaikuPlace", HaikuPlaceSchema,"haikuplace");

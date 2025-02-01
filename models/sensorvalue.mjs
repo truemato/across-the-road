@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const SensorValueSchema = new mongoose.Schema({
   value: Number,          // 例: センサー生値や runValue
@@ -10,4 +10,4 @@ const SensorValueSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
-module.exports = mongoose.model("SensorValue", SensorValueSchema, "sensorvalue");
+export default mongoose.model("SensorValue", SensorValueSchema, "sensorvalue");
