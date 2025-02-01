@@ -19,9 +19,24 @@ const io = new Server(server);
 app.use(express.json());
 app.use(express.static("public"));
 
+// テンプレートエンジン設定
+app.set('view engine', 'ejs');
+
+app.get('/', (req, res) => {
+  res.render('index', {
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY
+  });
+});
+
 let currentLat = 0;
 let currentLng = 0;
 let arduinoData = { run: 0, output_rpm: 0 };
+
+// MongoDB接続
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("Connected to MongoDB"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
 // ボーレート設定
 const baudRate = 9600;
@@ -44,12 +59,6 @@ async function findArduinoPort() {
     return null;
   }
 }
-
-// MongoDB接続
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.error("MongoDB connection error:", err));
 
 // Arduino ポートを取得して接続
 (async () => {

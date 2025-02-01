@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>細道</title>
   <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
-  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAQEIB7oCuYiffOAveLdbajrAbipXBnJMw
-  " async defer></script>
+  <!-- 環境変数から Google Maps API Key を挿入 -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>" async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <style>
