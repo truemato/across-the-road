@@ -1,17 +1,13 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>細道</title>
-  <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
-  <!-- 環境変数から Google Maps API Key を挿入 -->
   <script src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>" async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <style>
-
     body {
       margin: 0;
       padding: 0;
@@ -19,32 +15,14 @@
       height: 100vh;
       overflow: hidden;
     }
-    #port-selector {
-            position: fixed;
-            right: 10px;
-            bottom: 10px;
-            background: white;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
-        }
-        select, button {
-            margin-top: 5px;
-            width: 100%;
-        }
-        #status {
-            margin-top: 10px;
-            font-size: 14px;
-        }
     #threejs-container {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      z-index: 3; /* 地図より背面に配置 */
-      pointer-events: none; /* Three.jsが地図操作を邪魔しない */
+      z-index: 3;
+      pointer-events: none;
     }
     #street-view {
       position: absolute;
@@ -76,19 +54,6 @@
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
-    #input {
-      position: absolute;
-      left: 50%;
-      bottom: 20px;
-      transform: translateX(-50%);
-      width: 30%;
-      height: 40px;
-      border-radius: 8px;
-      padding: 10px 15px;
-      border: none;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-      z-index: 2;
-    }
     #input-log {
       position: absolute;
       right: 20px;
@@ -108,41 +73,18 @@
   <div id="street-view"></div>
   <div id="map"></div>
   <div id="current-log">Loading...</div>
-  <div id="sensor-log" style="position: absolute; top: 20px; right: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);">
-    Loading...
-  </div>
-  <input id="input" placeholder="Enter a word..." />
   <div id="input-log"></div>
-    <div id="threejs-container"></div>
-        <div id="port-selector">
-        <label for="port-list">Select Serial Port:</label>
-        <select id="port-list"></select>
-        <button id="connect-btn">Connect</button>
-        <div id="status">Not Connected</div>
-    </div>
+  <div id="threejs-container"></div>
 
   <script>
     // Three.js 初期化
-    let runValue = 0;
-    let outputRpm = 0;
-    let spin = 10;
-    let distance_cm = 0;
-    let currentLat = 34.9862105;
-    let currentLng = 135.7662586;
-    let accumulatedDistance = 0; // 今回のステップごとに貯まる距離(cm)
-    let totalDistance = 0;       // セッション内の総距離(cm)
-    let updateCount = 0;         // 緯度経度を更新した回数
-    // 1rpm = 35.06 cm/秒（仮定）
-    // 659.4 cm 移動ごとに lat +0.00042, lng +0.00051
-
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ alpha: true });
 
     const container = document.getElementById('threejs-container');
-    
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setClearColor(0x000000, 0); // 背景を透過
+    renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
     const light = new THREE.PointLight(0xffffff, 1);
@@ -163,159 +105,22 @@
     scene.add(group);
     camera.position.z = 40;
 
+    let currentValue = 0;
+    let currentLat = 34.9862105;
+    let currentLng = 135.7662586;
+    let updateCount = 0;
+    let totalDistance = 0;
+    let map, marker, streetView;
+
     function animate() {
       requestAnimationFrame(animate);
-      group.rotation.x -= outputRpm * 0.33;
-      // ラジアン角度 0.10472 60分の1秒 = 円周 210 x 3.14 = 659.4 cm
-      // rpm 0.6 = 円周 6.7 x 3.14 = 21.038 cm
-      // モーター31.343周 = 大車輪の1周 = 18.80597 rpm
-      // 0.10472 / 187.658 = 0.0033
-      // 1 rpm = 35.06333 cm
-      // 
-      // 659.4cm 北東への移動 = 65.94m * cos45° = 65.94m * 0.7071 ≒ 46.67m
-      // 北東に 6594 cm 進んだ時、緯度は約0.00042度増加し、経度は約0.00051度増加
-      distance_cm = outputRpm * 35.06
+      group.rotation.x -= currentValue * 0.33; // valueの値に基づいて回転
       renderer.render(scene, camera);
     }
     animate();
-    
-    
-    // Socket.IO リスナー設定
-    const socket = io("http://localhost:4000"); // グローバルに定義
-    
 
-    async function fetchLastPlace() {
-      try {
-        const response = await fetch('http://localhost:4000/api/lastplace'); // APIエンドポイント
-        if (!response.ok) {
-          throw new Error('Failed to fetch last place data');
-        }
-        const data = await response.json();
-        return { lat: data[0].lat, lng: data[0].lng }; // 最新の座標を返す
-      } catch (error) {
-        console.error('Error fetching last place:', error);
-        return { lat: 35.6895, lng: 139.6917 }; // デフォルト座標 (東京)
-      }
-    }
-    document.getElementById("input").addEventListener("keypress", async (e) => {
-  if (e.key === "Enter") {
-    const inputElement = e.target;
-    const comment = inputElement.value.trim();
-    if (!comment) return;
-
-    try {
-      // 地図の現在位置を取得
-      const center = map.getCenter();
-      const lat = center.lat();
-      const lng = center.lng();
-
-      // まず逆ジオコーディングを実行
-      const geocoder = new google.maps.Geocoder();
-      const location = { lat, lng };
-
-      geocoder.geocode({ location }, async (results, status) => {
-        if (status === "OK" && results[0]) {
-          // 場所名を取得（日本語の住所を優先）
-          const placename = results[0].formatted_address;
-
-          // データをサーバーに送信
-          const response = await fetch("/api/haikuplace", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              lat,
-              lng,
-              placename,
-              comment
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          // 入力欄をクリア
-          inputElement.value = "";
-          
-          // 入力履歴を更新
-          await updateInputLog();
-        } else {
-          console.error("Geocoding failed:", status);
-          // ジオコーディングに失敗しても、コメントは保存する
-          const response = await fetch("/api/haikuplace", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              lat,
-              lng,
-              placename: "住所不明",
-              comment
-            })
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          inputElement.value = "";
-          await updateInputLog();
-        }
-      });
-
-    } catch (error) {
-      console.error("Error saving input:", error);
-    }
-  }
-});
-
-// 入力履歴を取得・表示する関数
-async function updateInputLog() {
-  try {
-    const response = await fetch("/api/haikuplace");
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const entries = await response.json();
-    const inputLog = document.getElementById("input-log");
-    
-    // 入力履歴を整形して表示
-    inputLog.innerHTML = entries.map(entry => {
-      // 場所名の処理
-      let displayPlace = entry.placename || "住所不明";
-      
-      return `
-        <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-          <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">
-            ${new Date(entry.timestamp).toLocaleString()}
-          </div>
-          <div style="margin-bottom: 5px; font-size: 1.1em;">
-            ${entry.comment}
-          </div>
-          <div style="font-size: 0.8em; color: #888;">
-            ${displayPlace}
-          </div>
-        </div>
-      `;
-    }).join("");
-
-  } catch (error) {
-    console.error("Error updating input log:", error);
-  }
-}
-
-
-// 初期表示時に入力履歴を取得
-document.addEventListener("DOMContentLoaded", () => {
-  updateInputLog();
-});
-
-
-      async function initMap() {
+    // 地図の初期化
+    async function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: currentLat, lng: currentLng },
         zoom: 15,
@@ -334,84 +139,83 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       map.setStreetView(streetView);
     }
+
+    // データの定期更新
     async function fetchData() {
-      try {
-        const response = await fetch("http://localhost:4000/data");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+  try {
+    const response = await fetch("/api/sensorvalue");
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    
+    if (data && data.length > 0) {
+      const latestData = data[0];
+          // Three.jsの回転速度を更新
+          currentValue = latestData.value;
+          
+          // 位置情報を更新
+          currentLat = latestData.lat;
+          currentLng = latestData.lng;
+          updateCount = latestData.updateCount;
+          totalDistance = latestData.totalDistance;
+
+          // 地図とストリートビューを更新
+          const newPosition = { lat: currentLat, lng: currentLng };
+          map.setCenter(newPosition);
+          marker.setPosition(newPosition);
+          streetView.setPosition(newPosition);
+
+          // ステータス表示を更新
+          document.getElementById("current-log").textContent =
+            `Value: ${currentValue.toFixed(2)}, ` +
+            `Lat: ${currentLat.toFixed(6)}, Lng: ${currentLng.toFixed(6)}, ` +
+            `Update#: ${updateCount}, Distance: ${totalDistance.toFixed(2)} cm`;
         }
-        const data = await response.json();
-        // ここで runValue/outputRpm を更新
-        runValue = data.run;
-        outputRpm = data.output_rpm;
-
-        // --- 距離を計算 ---
-        // 1秒あたり outputRpm * 35.06 cm と仮定
-        const distanceToAdd = outputRpm * 35.06; 
-        accumulatedDistance += distanceToAdd;
-        totalDistance += distanceToAdd; // セッション内合計距離
-
-        // もし accumulatedDistance が 659.4cm 以上になったら、
-        // 659.4cm ごとに lat,lng を更新し、カウントを増やす
-        while (accumulatedDistance >= 659.4) {
-          currentLat += 0.00042; 
-          currentLng += 0.00051;
-          accumulatedDistance -= 659.4;
-          updateCount++;
-        }
-
-        // --- Map / StreetView の位置を更新 ---
-        const newPosition = { lat: currentLat, lng: currentLng };
-        map.setCenter(newPosition);
-        marker.setPosition(newPosition);
-        streetView.setPosition(newPosition);
-
-        // --- DBにも保存したい場合は fetchで送信 (RESTの例) ---
-        // 「センサ値 + 緯度経度など」を保存しておきたいなら:
-        const sensorValueBody = {
-          value: data.run,
-          total: data.total,
-          lat: currentLat,
-          lng: currentLng,
-          updateCount,
-          totalDistance, // cm単位で格納（必要に応じてm/km換算）
-        };
-
-        const sensorResp = await fetch("http://localhost:4000/api/sensorvalue", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(sensorValueBody),
-        });
-        const savedData = await sensorResp.json();
-        console.log("SensorValue saved:", savedData);
-
-        // 画面にも表示
-        document.getElementById("current-log").textContent =
-          `RPM: ${outputRpm.toFixed(2)}, ` +
-          `Lat: ${currentLat.toFixed(6)}, Lng: ${currentLng.toFixed(6)}, ` +
-          `Update#: ${updateCount}, Distance: ${totalDistance.toFixed(2)} cm`;
-
       } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching sensor data:", error);
       }
     }
-  // グローバル変数を使った例
-  function logValues() {
-      console.log(`Run Value: ${runValue}`);
-      console.log(`Output RPM: ${outputRpm}`);
-      console.log(`currentLat: ${currentLat}`);
-      console.log(`currentLng: ${currentLng}`);
-  }
 
-    // 1秒ごとにデータを取得
+    // 入力履歴の更新
+    async function updateInputLog() {
+      try {
+        const response = await fetch("/api/haikuplace");
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const entries = await response.json();
+        const inputLog = document.getElementById("input-log");
+        
+        inputLog.innerHTML = entries
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+          .map(entry => `
+            <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">
+                ${new Date(entry.timestamp).toLocaleString()}
+              </div>
+              <div style="margin-bottom: 5px; font-size: 1.1em;">
+                ${entry.comment}
+              </div>
+              <div style="font-size: 0.8em; color: #888;">
+                ${entry.placename || "場所不明"}
+              </div>
+            </div>
+          `).join("");
+      } catch (error) {
+        console.error("Error updating input log:", error);
+      }
+    }
+
+    // 定期的なデータ更新
     setInterval(fetchData, 1000);
-    setInterval(logValues, 1000);
+    setInterval(updateInputLog, 5000);
 
+    // 初期化
     window.onload = () => {
       initMap();
-      // setupSocketListeners();
+      fetchData();
+      updateInputLog();
     };
 
+    // リサイズ対応
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
