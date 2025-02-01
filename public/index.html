@@ -182,31 +182,65 @@
     try {
       // 地図の現在位置を取得
       const center = map.getCenter();
-      const data = {
-        lat: center.lat(),
-        lng: center.lng(),
-        placename: "", // サーバー側で逆ジオコーディングされる
-        comment: comment
-      };
+      const lat = center.lat();
+      const lng = center.lng();
 
-      // データをサーバーに送信
-      const response = await fetch("/api/haikuplace", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data)
+      // まず逆ジオコーディングを実行
+      const geocoder = new google.maps.Geocoder();
+      const location = { lat, lng };
+
+      geocoder.geocode({ location }, async (results, status) => {
+        if (status === "OK" && results[0]) {
+          // 場所名を取得（日本語の住所を優先）
+          const placename = results[0].formatted_address;
+
+          // データをサーバーに送信
+          const response = await fetch("/api/haikuplace", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              lat,
+              lng,
+              placename,
+              comment
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          // 入力欄をクリア
+          inputElement.value = "";
+          
+          // 入力履歴を更新
+          await updateInputLog();
+        } else {
+          console.error("Geocoding failed:", status);
+          // ジオコーディングに失敗しても、コメントは保存する
+          const response = await fetch("/api/haikuplace", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              lat,
+              lng,
+              placename: "住所不明",
+              comment
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          inputElement.value = "";
+          await updateInputLog();
+        }
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      // 入力欄をクリア
-      inputElement.value = "";
-      
-      // 入力履歴を更新
-      await updateInputLog();
 
     } catch (error) {
       console.error("Error saving input:", error);
@@ -226,24 +260,30 @@ async function updateInputLog() {
     const inputLog = document.getElementById("input-log");
     
     // 入力履歴を整形して表示
-    inputLog.innerHTML = entries.map(entry => `
-      <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">
-          ${new Date(entry.timestamp).toLocaleString()}
+    inputLog.innerHTML = entries.map(entry => {
+      // 場所名の処理
+      let displayPlace = entry.placename || "住所不明";
+      
+      return `
+        <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">
+            ${new Date(entry.timestamp).toLocaleString()}
+          </div>
+          <div style="margin-bottom: 5px; font-size: 1.1em;">
+            ${entry.comment}
+          </div>
+          <div style="font-size: 0.8em; color: #888;">
+            ${displayPlace}
+          </div>
         </div>
-        <div style="margin-bottom: 5px; font-size: 1.1em;">
-          ${entry.comment}
-        </div>
-        <div style="font-size: 0.8em; color: #888;">
-          ${entry.placename || "場所名取得中..."}
-        </div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
 
   } catch (error) {
     console.error("Error updating input log:", error);
   }
 }
+
 
 // 初期表示時に入力履歴を取得
 document.addEventListener("DOMContentLoaded", () => {
