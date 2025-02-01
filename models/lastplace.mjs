@@ -8,4 +8,4 @@ const LastPlaceSchema = new mongoose.Schema({
   timestamp: { type: Date, default: Date.now },
 });
 
-export default mongoose.model("LastPlace", LastPlaceSchema, "lastplace");
+export const LastPlace = mongoose.model("LastPlace", LastPlaceSchema, "lastplace");

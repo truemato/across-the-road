@@ -4,6 +4,8 @@ import http from "http";
 import mongoose from "mongoose";
 import path from "path";
 import { fileURLToPath } from "url";
+import { HaikuPlace } from './models/haikuplace.mjs';
+import { SensorValue } from './models/sensorvalue.mjs';
 
 dotenv.config();
 
@@ -23,8 +25,32 @@ app.set("views", path.join(__dirname, "views"));
 
 app.get("/", (req, res) => {
   res.render("index", {
-    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+    googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '',
   });
+});
+
+// haikuplaceデータ取得用エンドポイント
+app.get('/api/haikuplace', async (req, res) => {
+  try {
+    const haikus = await HaikuPlace.find()
+      .sort({ timestamp: -1 })
+      .limit(50);
+    res.json(haikus);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// センサー値取得用エンドポイント
+app.get('/api/sensorvalue', async (req, res) => {
+  try {
+    const sensorData = await SensorValue.find()
+      .sort({ timestamp: -1 })
+      .limit(1);
+    res.json(sensorData);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // MongoDB に接続
