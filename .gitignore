@@ -1,3 +1,7 @@
 node_modules/
 *.env
+<<<<<<< HEAD
 config.js
+=======
+config.js
+>>>>>>> 8c9b17a9ea699cd3e98d85b61060b97b8065bf77
