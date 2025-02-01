@@ -9,7 +9,6 @@
   <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAQEIB7oCuYiffOAveLdbajrAbipXBnJMw
   " async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="/main.js"></script>
 
   <style>
 
@@ -81,7 +80,7 @@
       overflow-y: auto;
       border-radius: 8px;
       padding: 15px;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(200, 200, 200, 0.9);
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
@@ -176,45 +175,81 @@
     }
     document.getElementById("input").addEventListener("keypress", async (e) => {
   if (e.key === "Enter") {
-     // 入力値を先に取得
-    const comment = e.target.value.trim();
+    const inputElement = e.target;
+    const comment = inputElement.value.trim();
+    if (!comment) return;
 
-     // 入力欄をクリア
-    e.target.value = "";
-     socket.emit("inputData", { input: comment });
-
-    // 地図の現在中心座標を取得（StreetView ではなく Map の中心を使用する例）
-    const center = map.getCenter();
-    const lat = center.lat();
-    const lng = center.lng();
-
-    // placename は一旦空や任意の文字を入れておく（必要に応じて実装）
-    const placename = "";
-
-    // HaikuPlaceテーブル（MongoDB）に POST
     try {
+      // 地図の現在位置を取得
+      const center = map.getCenter();
+      const data = {
+        lat: center.lat(),
+        lng: center.lng(),
+        placename: "", // サーバー側で逆ジオコーディングされる
+        comment: comment
+      };
+
+      // データをサーバーに送信
       const response = await fetch("/api/haikuplace", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          lat,
-          lng,
-          placename,
-          comment,  // 先ほど取得した入力値を送る
-        }),
+        body: JSON.stringify(data)
       });
+
       if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      const data = await response.json();
-      console.log("Posted to HaikuPlace:", data);
+
+      // 入力欄をクリア
+      inputElement.value = "";
+      
+      // 入力履歴を更新
+      await updateInputLog();
+
     } catch (error) {
-      console.error("Error posting comment to HaikuPlace:", error);
+      console.error("Error saving input:", error);
     }
   }
 });
+
+// 入力履歴を取得・表示する関数
+async function updateInputLog() {
+  try {
+    const response = await fetch("/api/haikuplace");
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const entries = await response.json();
+    const inputLog = document.getElementById("input-log");
+    
+    // 入力履歴を整形して表示
+    inputLog.innerHTML = entries.map(entry => `
+      <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">
+          ${new Date(entry.timestamp).toLocaleString()}
+        </div>
+        <div style="margin-bottom: 5px; font-size: 1.1em;">
+          ${entry.comment}
+        </div>
+        <div style="font-size: 0.8em; color: #888;">
+          ${entry.placename || "場所名取得中..."}
+        </div>
+      </div>
+    `).join("");
+
+  } catch (error) {
+    console.error("Error updating input log:", error);
+  }
+}
+
+// 初期表示時に入力履歴を取得
+document.addEventListener("DOMContentLoaded", () => {
+  updateInputLog();
+});
+
 
       async function initMap() {
       map = new google.maps.Map(document.getElementById("map"), {
