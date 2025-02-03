@@ -4,9 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>細道</title>
-  <script src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>" async defer></script>
+  <script src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>&callback=initMap&v=weekly&libraries=marker" async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
   <style>
     body {
       margin: 0;
@@ -119,16 +118,20 @@
     }
     animate();
 
-    // 地図の初期化
     async function initMap() {
+      // マップの初期化
       map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: currentLat, lng: currentLng },
         zoom: 15,
+        mapId: "d083e2f5874ba61c",  // mapID は mapId に変更される可能性もあるので注意
       });
-      marker = new google.maps.Marker({
+      // AdvancedMarkerElement の初期化
+      marker = new google.maps.marker.AdvancedMarkerElement({
         position: { lat: currentLat, lng: currentLng },
         map: map,
+        // 必要に応じて title や content などのプロパティを追加できます
       });
+      // StreetView の初期化
       streetView = new google.maps.StreetViewPanorama(
         document.getElementById("street-view"),
         {
@@ -160,10 +163,10 @@
 
           // 地図とストリートビューを更新
           const newPosition = { lat: currentLat, lng: currentLng };
-          map.setCenter(newPosition);
-          marker.setPosition(newPosition);
-          streetView.setPosition(newPosition);
-
+      // map.setCenter(newPosition);
+        marker.position = newPosition;
+        streetView.position = newPosition;
+        const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
             `Value: ${currentValue.toFixed(2)}, ` +
@@ -205,7 +208,7 @@
     }
 
     // 定期的なデータ更新
-    setInterval(fetchData, 1000);
+    setInterval(fetchData, 10000);
     setInterval(updateInputLog, 5000);
 
     // 初期化
