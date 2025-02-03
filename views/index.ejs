@@ -161,12 +161,14 @@
           updateCount = latestData.updateCount;
           totalDistance = latestData.totalDistance;
 
-          // 地図とストリートビューを更新
           const newPosition = { lat: currentLat, lng: currentLng };
-      // map.setCenter(newPosition);
-        marker.position = newPosition;
-        streetView.position = newPosition;
-        const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+          map.setCenter(newPosition);
+          marker.position = newPosition;
+          streetView.position = newPosition;
+          streetView.setPosition(newPosition); 
+          
+          const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
+          
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
             `Value: ${currentValue.toFixed(2)}, ` +
