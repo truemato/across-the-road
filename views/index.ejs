@@ -1,10 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>細道</title>
-  <script src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>&callback=initMap&v=weekly&libraries=marker" async defer></script>
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>&callback=initMap&v=weekly&libraries=marker"
+    async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     body {
@@ -14,6 +17,7 @@
       height: 100vh;
       overflow: hidden;
     }
+
     #threejs-container {
       position: absolute;
       top: 0;
@@ -23,6 +27,7 @@
       z-index: 3;
       pointer-events: none;
     }
+
     #street-view {
       position: absolute;
       top: 0;
@@ -31,6 +36,7 @@
       height: 100vh;
       z-index: 1;
     }
+
     #map {
       position: absolute;
       left: 20px;
@@ -38,10 +44,11 @@
       width: 30%;
       height: 30vh;
       border-radius: 15px;
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, s255, 255, 0.9);
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
+
     #current-log {
       position: absolute;
       top: 10％;
@@ -53,11 +60,12 @@
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
+
     #input-log {
       position: absolute;
       right: 20px;
       top: 15%;
-      width: 24%;
+      width: 28%;
       max-height: 80vh;
       overflow-y: auto;
       border-radius: 8px;
@@ -68,6 +76,7 @@
     }
   </style>
 </head>
+
 <body>
   <div id="street-view"></div>
   <div id="map"></div>
@@ -145,16 +154,16 @@
 
     // データの定期更新
     async function fetchData() {
-  try {
-    const response = await fetch("/api/sensorvalue");
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    const data = await response.json();
-    
-    if (data && data.length > 0) {
-      const latestData = data[0];
+      try {
+        const response = await fetch("/api/sensorvalue");
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        if (data && data.length > 0) {
+          const latestData = data[0];
           // Three.jsの回転速度を更新
           currentValue = latestData.value;
-          
+
           // 位置情報を更新
           currentLat = latestData.lat;
           currentLng = latestData.lng;
@@ -165,14 +174,14 @@
           map.setCenter(newPosition);
           marker.position = newPosition;
           streetView.position = newPosition;
-          streetView.setPosition(newPosition); 
-         
+          streetView.setPosition(newPosition);
+
           const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
-          
+
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
             `緯度: ${currentLat.toFixed(2)}, 経度: ${currentLng.toFixed(2)}, ` +
-            `走行距離: ${totalDistance.toFixed(0)} sszm`;
+            `走行距離: ${totalDistance.toFixed(0)} m`;
         }
       } catch (error) {
         console.error("Error fetching sensor data:", error);
@@ -184,10 +193,10 @@
       try {
         const response = await fetch("/api/haikuplace");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
+
         const entries = await response.json();
         const inputLog = document.getElementById("input-log");
-        
+
         inputLog.innerHTML = entries
           .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
           .map(entry => `
@@ -227,4 +236,5 @@
     });
   </script>
 </body>
+
 </html>
