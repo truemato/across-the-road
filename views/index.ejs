@@ -55,8 +55,8 @@
     }
     #input-log {
       position: absolute;
-      right: 20％;
-      top: 20px;
+      right: 20px;
+      top: 15%;
       width: 20%;
       max-height: 80vh;
       overflow-y: auto;
@@ -193,13 +193,13 @@
           .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
           .map(entry => `
             <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-              <div style="font-size: 0.9em; color: #666; margin-bottom: 5px;">
+              <div style="font-size: 0.5em; color: #666; margin-bottom: 5px;">
                 ${new Date(entry.timestamp).toLocaleString()}
               </div>
-              <div style="margin-bottom: 5px; font-size: 1.1em;">
+              <div style="margin-bottom: 5px; font-size: 1em;">
                 ${entry.comment}
               </div>
-              <div style="font-size: 0.8em; color: #888;">
+              <div style="font-size: 0.5em; color: #888;">
                 ${entry.placename || "場所不明"}
               </div>
             </div>
