@@ -2,13 +2,22 @@
   "name": "server",
   "version": "1.0.0",
   "description": "",
+  "homepage": "https://github.com/truemato/across-the-road#readme",
+  "bugs": {
+    "url": "https://github.com/truemato/across-the-road/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/truemato/across-the-road.git"
+  },
   "license": "ISC",
   "author": "",
   "type": "module",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "format": "eslint . --fix"
+    "format": "eslint . --fix",
+    "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
