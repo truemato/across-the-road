@@ -181,8 +181,8 @@
 
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
-            `走行距離: ${totalDistance.toFixed(0)} m, Update: ${updateCount}` +
-            `緯度: ${currentLat.toFixed(2)}, 経度: ${currentLng.toFixed(2)}, `;
+            `走行距離: ${totalDistance.toFixed(0)} m, RPM: ${outputRpm.toFixed(2)}, ` +
+            `緯度: ${currentLat.toFixed(2)}, 経度: ${currentLng.toFixed(2)}`;
         }
       } catch (error) {
         console.error("Error fetching sensor data:", error);
