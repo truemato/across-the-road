@@ -166,14 +166,13 @@
           marker.position = newPosition;
           streetView.position = newPosition;
           streetView.setPosition(newPosition); 
-          
+         
           const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
           
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
-            `Value: ${currentValue.toFixed(2)}, ` +
-            `Lat: ${currentLat.toFixed(6)}, Lng: ${currentLng.toFixed(6)}, ` +
-            `Update#: ${updateCount}, Distance: ${totalDistance.toFixed(2)} cm`;
+            `緯度: ${currentLat.toFixed(2)}, 経度: ${currentLng.toFixed(2)}, ` +
+            `走行距離: ${totalDistance.toFixed(0)} sszm`;
         }
       } catch (error) {
         console.error("Error fetching sensor data:", error);
