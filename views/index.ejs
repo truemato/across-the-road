@@ -44,7 +44,7 @@
       width: 30%;
       height: 30vh;
       border-radius: 15px;
-      background: rgba(255, s255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.9);
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
@@ -86,69 +86,34 @@
   <div id="threejs-container"></div>
 
   <script>
-// Three.js 初期化
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-const renderer = new THREE.WebGLRenderer({ alpha: true });
+    // Three.js 初期化
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ alpha: true });
 
-const container = document.getElementById("threejs-container");
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x000000, 0);
-container.appendChild(renderer.domElement);
+    const container = document.getElementById('threejs-container');
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 0);
+    container.appendChild(renderer.domElement);
 
-// ライトの追加
-const light = new THREE.PointLight(0xffffff, 1);
-light.position.set(10, 10, 10);
-scene.add(light);
+    const light = new THREE.PointLight(0xffffff, 1);
+    light.position.set(10, 10, 10);
+    scene.add(light);
 
-// マテリアルの用意
-const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-const whiteMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+    const whiteMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const group = new THREE.Group();
 
-// グループ作成
-const group = new THREE.Group();
-
-// 四分割円柱(ドーナツスライス風)の作成
-for (let i = 0; i < 4; i++) {
-  const geometry = new THREE.CylinderGeometry(
-    5, // 上面半径
-    5, // 底面半径
-    2, // 高さ
-    32, // 分割数
-    1,  // 高さ方向の分割数
-    false, // 上下面を開くか
-    i * Math.PI / 2, // 開始角
-    Math.PI / 2      // スイープ角
-  );
-  const material = i % 2 === 0 ? redMaterial : whiteMaterial;
-  const section = new THREE.Mesh(geometry, material);
-  group.add(section);
-}
-
-// ドーナツが寝転がっているのでz軸で90度回転
-group.rotation.z = Math.PI / 2;
-
-// 立体感がわかりやすいように少しスケールアップ
-group.scale.set(1.5, 1.5, 1.5);
-
-// シーンに追加
-scene.add(group);
-
-// カメラ位置と向きを調整 (左後ろから見下ろすイメージ)
-camera.position.set(10, 15, 35);
-camera.lookAt(group.position);
-
-// レンダリング開始
-function animate() {
-  requestAnimationFrame(animate);
-  renderer.render(scene, camera);
-}
-animate();
+    for (let i = 0; i < 4; i++) {
+      const geometry = new THREE.CylinderGeometry(5, 5, 2, 32, 1, false, i * Math.PI / 2, Math.PI / 2);
+      const material = i % 2 === 0 ? redMaterial : whiteMaterial;
+      const section = new THREE.Mesh(geometry, material);
+      group.add(section);
+    }
+    group.rotation.z = Math.PI / 2;
+    scene.add(group);
+    camera.position.set(10, 15, 35);
+    camera.lookAt(group.position);
     let currentValue = 0;
     let currentLat = 34.9862105;
     let currentLng = 135.7662586;
@@ -216,7 +181,7 @@ animate();
 
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
-            `走行距離: ${totalDistance.toFixed(0)} m, RPM: ${outputRpm.toFixed(2)}, ` +
+            `走行距離: ${totalDistance.toFixed(0)} m, Update: ${updateCount}` +
             `緯度: ${currentLat.toFixed(2)}, 経度: ${currentLng.toFixed(2)}`;
         }
       } catch (error) {
@@ -240,7 +205,7 @@ animate();
               <div style="font-size: 0.5em; color: #666; margin-bottom: 5px;">
                 ${new Date(entry.timestamp).toLocaleString()}
               </div>
-              <div style="margin-bottom: 5px; font-size: 1em;">
+              <div style="margin-bottom: 5px; font-size: 0.9em;">
                 ${entry.comment}
               </div>
               <div style="font-size: 0.5em; color: #888;">
