@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>細道</title>
-  <script
+  <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+  <!-- 環境変数から Google Maps API Key を挿入 -->
+    <script
     src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>&callback=initMap&v=weekly&libraries=marker"
     async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
   <style>
+
     body {
       margin: 0;
       padding: 0;
@@ -17,17 +20,33 @@
       height: 100vh;
       overflow: hidden;
     }
-
+    #port-selector {
+            position: fixed;
+            right: 10px;
+            bottom: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
+        }
+        select, button {
+            margin-top: 5px;
+            width: 100%;
+        }
+        #status {
+            margin-top: 10px;
+            font-size: 14px;
+        }
     #threejs-container {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      z-index: 3;
-      pointer-events: none;
+      z-index: 3; /* 地図より背面に配置 */
+      pointer-events: none; /* Three.jsが地図操作を邪魔しない */
     }
-
     #street-view {
       position: absolute;
       top: 0;
@@ -36,7 +55,6 @@
       height: 100vh;
       z-index: 1;
     }
-
     #map {
       position: absolute;
       left: 20px;
@@ -48,12 +66,10 @@
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
-
     #current-log {
-      position: absolute;
-      top: 50px;
+	position: absolute;
+      top: 20px;
       left: 50%;
-      width: 23%;
       transform: translateX(-50%);
       padding: 10px 20px;
       border-radius: 8px;
@@ -61,12 +77,11 @@
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
-
     #input-log {
       position: absolute;
       right: 20px;
-      top: 15%;
-      width: 28%;
+      top: 20px;
+      width: 20%;
       max-height: 80vh;
       overflow-y: auto;
       border-radius: 8px;
@@ -77,82 +92,57 @@
     }
   </style>
 </head>
-
-<body>
+	<body>
   <div id="street-view"></div>
   <div id="map"></div>
   <div id="current-log">Loading...</div>
+  <div id="sensor-log" style="position: absolute; top: 20px; right: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);">
+    Loading...
+  </div>
   <div id="input-log"></div>
-  <div id="threejs-container"></div>
+    <div id="threejs-container"></div>
 
   <script>
     // Three.js 初期化
-    let accumulatedDistance = 0;
-    let totalDistance = 0;
-    let updateCount = 0;
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ alpha: true });
 
-    const container = document.getElementById("threejs-container");
+    const container = document.getElementById('threejs-container');
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
     const light = new THREE.PointLight(0xffffff, 1);
-    //const light2 = new THREE.PointLight(0xffffff, 1);
-
     light.position.set(10, 10, 10);
-    //light2.position.set(10, -10, 10);
-
     scene.add(light);
-    //scene.add(light2);
 
     const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
     const whiteMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
     const group = new THREE.Group();
 
     for (let i = 0; i < 4; i++) {
-      const geometry = new THREE.CylinderGeometry(
-        5, // 上面半径
-        5, // 底面半径
-        2, // 高さ
-        32, // 分割数
-        1,  // 高さ方向の分割数
-        false, // 上下面を開くか
-        i * Math.PI / 2, // 開始角
-        Math.PI / 2      // スイープ角
-      );
+      const geometry = new THREE.CylinderGeometry(5, 5, 2, 32, 1, false, i * Math.PI / 2, Math.PI / 2);
       const material = i % 2 === 0 ? redMaterial : whiteMaterial;
       const section = new THREE.Mesh(geometry, material);
       group.add(section);
     }
-
     group.rotation.z = Math.PI / 2;
-    group.scale.set(1, 1, 1);
-    scene.add(group);
-    camera.position.set(10, 15, 35);
-    camera.lookAt(group.position);
 
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
-    animate();
-        function animate() {
-          requestAnimationFrame(animate);
-          group.rotation.x -= outputRpm * 0.33;
-          // 1 rpm = 35.06 cm/秒 (仮定)
-          distance_cm = outputRpm * 35.06;
-          renderer.render(scene, camera);
-        }
-        animate();
-        
+	group.scale.set(1.5, 1.5, 1.5);
+    scene.add(group);
+
+	// カメラ位置と向きを調整 (左後ろから見下ろすイメージ)
+	camera.position.set(10, 15, 35);
+	camera.lookAt(group.position);
+
+    let currentValue = 0;
+    let currentLat = 34.9862105;
+    let currentLng = 135.7662586;
+    let updateCount = 0;
+    let totalDistance = 0;
+    let map, marker, streetView;
+
     async function initPosition() {
       try {
         const response = await fetch("http://localhost:4000/api/lastplace/latest");
@@ -163,11 +153,15 @@
         currentLat = latestPlace.lat;
         currentLng = latestPlace.lng;
         console.log("最新の位置情報:", currentLat, currentLng);
-      } catch (error) {
+		} catch (error) {
         console.error("最新位置の取得に失敗しました:", error);
         // 失敗した場合はフェールバックの初期値がそのまま使用されます
       }
     }
+	function animate() {
+		requestAnimationFrame(animate);
+		renderer.render(scene, camera);
+	}
     animate();
 
     async function initMap() {
@@ -206,7 +200,7 @@
           const latestData = data[0];
           // Three.jsの回転速度を更新
           currentValue = latestData.value;
-
+        outputRpm = currentValue;
           // 位置情報を更新
           currentLat = latestData.lat;
           currentLng = latestData.lng;
@@ -223,10 +217,8 @@
 
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
-            `走行距離: ${totalDistance.toFixed(0)/100} m
-             Update: ${updateCount}
-             緯度: ${currentLat.toFixed(2)}
-             経度: ${currentLng.toFixed(2)}`;
+            `走行距離: 
+		 ${totalDistance.toFixed(0)/100} m`;
         }
       } catch (error) {
         console.error("Error fetching sensor data:", error);
@@ -249,7 +241,7 @@
               <div style="font-size: 0.5em; color: #666; margin-bottom: 5px;">
                 ${new Date(entry.timestamp).toLocaleString()}
               </div>
-              <div style="margin-bottom: 5px; font-size: 0.9em;">
+              <div style="margin-bottom: 5px; font-size: 1em;">
                 ${entry.comment}
               </div>
               <div style="font-size: 0.5em; color: #888;">
