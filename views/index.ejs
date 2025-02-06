@@ -87,44 +87,86 @@
 
   <script>
     // Three.js 初期化
+    let accumulatedDistance = 0;
+    let totalDistance = 0;
+    let updateCount = 0;
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
     const renderer = new THREE.WebGLRenderer({ alpha: true });
 
-    const container = document.getElementById('threejs-container');
+    const container = document.getElementById("threejs-container");
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
 
     const light = new THREE.PointLight(0xffffff, 1);
+    //const light2 = new THREE.PointLight(0xffffff, 1);
+
     light.position.set(10, 10, 10);
+    //light2.position.set(10, -10, 10);
+
     scene.add(light);
+    //scene.add(light2);
 
     const redMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
     const whiteMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff });
     const group = new THREE.Group();
 
     for (let i = 0; i < 4; i++) {
-      const geometry = new THREE.CylinderGeometry(5, 5, 2, 32, 1, false, i * Math.PI / 2, Math.PI / 2);
+      const geometry = new THREE.CylinderGeometry(
+        5, // 上面半径
+        5, // 底面半径
+        2, // 高さ
+        32, // 分割数
+        1,  // 高さ方向の分割数
+        false, // 上下面を開くか
+        i * Math.PI / 2, // 開始角
+        Math.PI / 2      // スイープ角
+      );
       const material = i % 2 === 0 ? redMaterial : whiteMaterial;
       const section = new THREE.Mesh(geometry, material);
       group.add(section);
     }
+
     group.rotation.z = Math.PI / 2;
+    group.scale.set(1, 1, 1);
     scene.add(group);
     camera.position.set(10, 15, 35);
     camera.lookAt(group.position);
-    let currentValue = 0;
-    let currentLat = 34.9862105;
-    let currentLng = 135.7662586;
-    let updateCount = 0;
-    let totalDistance = 0;
-    let map, marker, streetView;
 
     function animate() {
       requestAnimationFrame(animate);
-      group.rotation.x -= currentValue * 0.33; // valueの値に基づいて回転
       renderer.render(scene, camera);
+    }
+    animate();
+        function animate() {
+          requestAnimationFrame(animate);
+          group.rotation.x -= outputRpm * 0.33;
+          // 1 rpm = 35.06 cm/秒 (仮定)
+          distance_cm = outputRpm * 35.06;
+          renderer.render(scene, camera);
+        }
+        animate();
+        
+    async function initPosition() {
+      try {
+        const response = await fetch("http://localhost:4000/api/lastplace/latest");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const latestPlace = await response.json();
+        currentLat = latestPlace.lat;
+        currentLng = latestPlace.lng;
+        console.log("最新の位置情報:", currentLat, currentLng);
+      } catch (error) {
+        console.error("最新位置の取得に失敗しました:", error);
+        // 失敗した場合はフェールバックの初期値がそのまま使用されます
+      }
     }
     animate();
 
@@ -181,8 +223,10 @@
 
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
-            `走行距離: ${totalDistance.toFixed(0)} m, Update: ${updateCount}` +
-            `緯度: ${currentLat.toFixed(2)}, 経度: ${currentLng.toFixed(2)}`;
+            `走行距離: ${totalDistance.toFixed(0)/100} m
+             Update: ${updateCount}
+             緯度: ${currentLat.toFixed(2)}
+             経度: ${currentLng.toFixed(2)}`;
         }
       } catch (error) {
         console.error("Error fetching sensor data:", error);
