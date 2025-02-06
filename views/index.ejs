@@ -158,10 +158,11 @@
         // 失敗した場合はフェールバックの初期値がそのまま使用されます
       }
     }
-	function animate() {
-		requestAnimationFrame(animate);
-		renderer.render(scene, camera);
-	}
+    function animate() {
+      requestAnimationFrame(animate);
+      group.rotation.x -= currentValue * 0.33; // valueの値に基づいて回転
+      renderer.render(scene, camera);
+    }
     animate();
 
     async function initMap() {
@@ -188,6 +189,63 @@
       );
       map.setStreetView(streetView);
     }
+    function getNearestPanorama(location, radius = 100) {
+      return new Promise((resolve, reject) => {
+        const svService = new google.maps.StreetViewService();
+        svService.getPanorama({ location, radius }, (data, status) => {
+          if (
+            status === google.maps.StreetViewStatus.OK &&
+            data &&
+            data.location
+          ) {
+            resolve(data.location.latLng);
+          } else {
+            reject(
+              `No panorama found near ${location.lat}, ${location.lng} (status: ${status})`
+            );
+          }
+        });
+      });
+    }
+        // updatePegman: computedPos を基に Roads API でスナップし、さらに有効なパノラマがあれば更新
+    // ============================
+    async function updatePegman(computedPos) {
+      try {
+        const apiKey = "<%= googleMapsApiKey %>";
+        const roadsUrl = `https://roads.googleapis.com/v1/snapToRoads?path=${computedPos.lat},${computedPos.lng}&key=${apiKey}`;
+        const response = await fetch(roadsUrl);
+        if (!response.ok) {
+          throw new Error(`Roads API error: ${response.status}`);
+        }
+        const roadsData = await response.json();
+        let snappedPos;
+        if (roadsData.snappedPoints && roadsData.snappedPoints.length > 0) {
+          const loc = roadsData.snappedPoints[0].location;
+          snappedPos = { lat: loc.latitude, lng: loc.longitude };
+        } else {
+          snappedPos = computedPos;
+        }
+        // 取得した位置付近に有効なパノラマがあるか確認
+        try {
+          const nearestPanorama = await getNearestPanorama(
+            new google.maps.LatLng(snappedPos.lat, snappedPos.lng),
+            100
+          );
+          pegmanPosition = {
+            lat: nearestPanorama.lat(),
+            lng: nearestPanorama.lng(),
+          };
+          console.log("Pegman updated from panorama:", pegmanPosition);
+        } catch (panoramaErr) {
+          console.warn(panoramaErr);
+          pegmanPosition = snappedPos;
+        }
+        return pegmanPosition;
+      } catch (error) {
+        console.error("Error updating Pegman:", error);
+        return pegmanPosition;
+      }
+    }
 
     // データの定期更新
     async function fetchData() {
@@ -200,7 +258,7 @@
           const latestData = data[0];
           // Three.jsの回転速度を更新
           currentValue = latestData.value;
-        outputRpm = currentValue;
+          outputRpm = currentValue;
           // 位置情報を更新
           currentLat = latestData.lat;
           currentLng = latestData.lng;
@@ -218,7 +276,21 @@
           // ステータス表示を更新
           document.getElementById("current-log").textContent =
             `走行距離: 
-		 ${totalDistance.toFixed(0)/100} m`;
+		      ${totalDistance.toFixed(0)/100} m`;
+
+
+
+          const computedPos = { lat: currentLat, lng: currentLng };
+
+          // Marker と Map の中心は常に computedPos
+          marker.position = computedPos;
+          map.setCenter(computedPos);
+
+          // Street View (Pegman) の更新：computedPos を基に Roads API 経由で有効なパノラマ位置を取得
+          const newPegmanPos = await updatePegman(computedPos);
+          streetView.setPosition(newPegmanPos);
+
+
         }
       } catch (error) {
         console.error("Error fetching sensor data:", error);
