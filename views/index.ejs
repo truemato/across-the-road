@@ -90,6 +90,23 @@
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
+    a {
+      color: gray;
+      text-decoration: none;
+      border-bottom: 1px dotted gray;
+    }
+    a:visited {
+      color: gray;
+      border-bottom: 1px dotted gray;
+    }
+    a:hover {
+      color: gray;
+      border-bottom: 1px dotted gray;
+    }
+    a:active {
+      color: gray;
+      border-bottom: 1px dotted gray;
+    }
   </style>
 </head>
 	<body>
@@ -246,86 +263,99 @@
         return pegmanPosition;
       }
     }
-
-    // データの定期更新
-    async function fetchData() {
+    async function ensureStreetView(lat, lng) {
       try {
-        const response = await fetch("/api/sensorvalue");
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const data = await response.json();
-
-        if (data && data.length > 0) {
-          const latestData = data[0];
-          // Three.jsの回転速度を更新
-          currentValue = latestData.value;
-          outputRpm = currentValue;
-          // 位置情報を更新
-          currentLat = latestData.lat;
-          currentLng = latestData.lng;
-          updateCount = latestData.updateCount;
-          totalDistance = latestData.totalDistance;
-
-          const newPosition = { lat: currentLat, lng: currentLng };
-          map.setCenter(newPosition);
-          marker.position = newPosition;
-          streetView.position = newPosition;
-          streetView.setPosition(newPosition);
-
-          const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
-
-          // ステータス表示を更新
-          document.getElementById("current-log").textContent =
-            `走行距離: 
-		      ${totalDistance.toFixed(0)/100} m`;
-
-
-
-          const computedPos = { lat: currentLat, lng: currentLng };
-
-          // Marker と Map の中心は常に computedPos
-          marker.position = computedPos;
-          map.setCenter(computedPos);
-
-          // Street View (Pegman) の更新：computedPos を基に Roads API 経由で有効なパノラマ位置を取得
-          const newPegmanPos = await updatePegman(computedPos);
-          streetView.setPosition(newPegmanPos);
-
-
+        const apiKey = "<%= googleMapsApiKey %>"; // 必ず有効なGoogle Maps APIキー
+        const url = `https://maps.googleapis.com/maps/api/streetview/metadata?location=${lat},${lng}&key=${apiKey}`;
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          throw new Error("StreetView metadata fetch error: " + resp.status);
         }
-      } catch (error) {
-        console.error("Error fetching sensor data:", error);
+        const metadata = await resp.json();
+        // status が "OK" なら利用可能
+        if (metadata.status === "OK") {
+          console.log("StreetView available at:", lat, lng);
+          // StreetViewをその座標にセット
+          streetView.setPosition({ lat, lng });
+        } else {
+          console.warn("StreetView not available (status:", metadata.status, ")");
+          // 代わりに別の処理 (フォールバック)：
+          // 例: 近くの既知の座標に移動するとか、以前の座標を使う等
+        }
+      } catch (err) {
+        console.error("Error in ensureStreetView:", err);
       }
     }
+    // データの定期更新
+    async function fetchData() {
+  try {
+    const response = await fetch("/api/sensorvalue");
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+
+    if (data && data.length > 0) {
+      const latestData = data[0];
+      currentValue = latestData.value;
+      outputRpm = currentValue;
+      currentLat = latestData.lat;
+      currentLng = latestData.lng;
+      updateCount = latestData.updateCount;
+      totalDistance = latestData.totalDistance;
+
+      const newPosition = { lat: currentLat, lng: currentLng };
+      map.setCenter(newPosition);
+      marker.position = newPosition;
+
+      document.getElementById("current-log").textContent =
+        `RPM: ${ outputRpm } 走行距離: ${ (totalDistance / 100).toFixed(2) } m`;
+
+      // Pegman更新
+      const newPegmanPos = await updatePegman(newPosition);
+      
+      // ★ ここで ensureStreetView を呼ぶ（新しいPegman座標が確定した後）
+      await ensureStreetView(newPegmanPos.lat, newPegmanPos.lng);
+    }
+  } catch (error) {
+    console.error("Error fetching sensor data:", error);
+  }
+}
 
     // 入力履歴の更新
     async function updateInputLog() {
       try {
         const response = await fetch("/api/haikuplace");
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
         const entries = await response.json();
-        const inputLog = document.getElementById("input-log");
 
+        const inputLog = document.getElementById("input-log");
         inputLog.innerHTML = entries
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-          .map(entry => `
-            <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-              <div style="font-size: 0.5em; color: #666; margin-bottom: 5px;">
-                ${new Date(entry.timestamp).toLocaleString()}
+          .map((entry) => {
+            const displayPlace = entry.placename || "場所不明";
+            // クリックでマップを開く。lat,lng を利用してリンク作成
+            // 例: https://www.google.com/maps/search/?api=1&query=lat,lng
+            const linkUrl = `https://www.google.com/maps/search/?api=1&query=${entry.lat},${entry.lng}`;
+
+            return `
+              <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                <div style="font-size: 0.8em; color: #999; margin-bottom: 5px;">
+                  ${new Date(entry.timestamp).toLocaleString()}
+                </div>
+                <div style="margin-bottom: 5px; font-size: 1em;">
+                  ${entry.comment}
+                </div>
+                <div style="font-size: 0.8em; color: #999;">
+                  <a href="${linkUrl}" target="_blank">${displayPlace}</a>
+                </div>
               </div>
-              <div style="margin-bottom: 5px; font-size: 1em;">
-                ${entry.comment}
-              </div>
-              <div style="font-size: 0.5em; color: #888;">
-                ${entry.placename || "場所不明"}
-              </div>
-            </div>
-          `).join("");
+            `;
+          })
+          .join("");
       } catch (error) {
         console.error("Error updating input log:", error);
       }
     }
-
     // 定期的なデータ更新
     setInterval(fetchData, 1000);
     setInterval(updateInputLog, 10000);
