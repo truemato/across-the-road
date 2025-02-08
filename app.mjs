@@ -60,6 +60,6 @@ mongoose
   .catch((err) => console.error("MongoDB connection error:", err));
 
 // サーバー起動
-server.listen(3000, () => {
+server.listen(4000, () => {
   console.log("Server running on http://localhost:4000");
 });
