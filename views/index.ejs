@@ -10,7 +10,41 @@
     src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>&callback=initMap&v=weekly&libraries=marker"
     async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
+  <script>
+    function convertTategaki(str) {
+      const data = str.split('\n').map((line) => line.split(''));
+      const maxLength = Math.max(...data.map((arr) => arr.length));
+      const res = Array.from(Array(maxLength), (_, i) =>
+        data.map((row) => row[i] ?? '　').reverse(),
+      );
+      return res.map((line) => line.join('')).join('\n');
+    }
+    </script>
+    
+    <style>
+    .haiku-vertical {
+      writing-mode: vertical-rl;
+      text-orientation: upright;
+      white-space: pre;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    /* スマートフォン向けのスタイル */
+    @media screen and (max-width: 768px) {
+      .log-entry {
+        position: relative;
+      }
+      
+      .haiku-comment {
+        writing-mode: vertical-rl;
+        text-orientation: upright;
+        white-space: pre;
+        margin: 10px auto;
+        line-height: 1.5em; /* インラインブロック要素として表示 */
+      }
+    }
+    </style>
   <style>
 
     body {
@@ -80,14 +114,14 @@
     #input-log {
       position: absolute;
       right: 20px;
-      top: 20px;
+      top: 30px;
       width: 20%;
       max-height: 80vh;
       overflow-y: auto;
-      border-radius: 8px;
-      padding: 15px;
+      border-radius: 5px;
+      padding: 10px;
       background: rgba(200, 200, 200, 0.9);
-      z-index: 2;
+      z-index: 1;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
     a {
@@ -322,40 +356,45 @@
 
     // 入力履歴の更新
     async function updateInputLog() {
-      try {
-        const response = await fetch("/api/haikuplace");
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const entries = await response.json();
-
-        const inputLog = document.getElementById("input-log");
-        inputLog.innerHTML = entries
-          .map((entry) => {
-            const displayPlace = entry.placename || "場所不明";
-            // クリックでマップを開く。lat,lng を利用してリンク作成
-            // 例: https://www.google.com/maps/search/?api=1&query=lat,lng
-            const linkUrl = `https://www.google.com/maps/search/?api=1&query=${entry.lat},${entry.lng}`;
-
-            return `
-              <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                <div style="font-size: 0.8em; color: #999; margin-bottom: 5px;">
-                  ${new Date(entry.timestamp).toLocaleString()}
-                </div>
-                <div style="margin-bottom: 5px; font-size: 1em;">
-                  ${entry.comment}
-                </div>
-                <div style="font-size: 0.8em; color: #999;">
-                  <a href="${linkUrl}" target="_blank">${displayPlace}</a>
-                </div>
-              </div>
-            `;
-          })
-          .join("");
-      } catch (error) {
-        console.error("Error updating input log:", error);
-      }
+  try {
+    const response = await fetch("/api/haikuplace");
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    const entries = await response.json();
+    const isMobile = window.innerWidth <= 768;
+
+    const inputLog = document.getElementById("input-log");
+    inputLog.innerHTML = entries
+      .map((entry) => {
+        const displayPlace = entry.placename || "場所不明";
+        const linkUrl = `https://www.google.com/maps/search/?api=1&query=${entry.lat},${entry.lng}`;
+        
+        // スマートフォンの場合は俳句を縦書きに変換
+        const commentText = isMobile ? 
+          `<div class="haiku-comment">${entry.comment}</div>` :
+          `<div>${entry.comment}</div>`;
+
+        return `
+          <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.8em; color: #999; margin-bottom: 5px;">
+              ${new Date(entry.timestamp).toLocaleString()}
+            </div>
+            ${commentText}
+            <div style="font-size: 0.8em; color: #999;">
+              <a href="${linkUrl}" target="_blank">${displayPlace}</a>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  } catch (error) {
+    console.error("Error updating input log:", error);
+  }
+}
+
+// ウィンドウサイズが変更されたときにも更新
+window.addEventListener('resize', updateInputLog);
     // 定期的なデータ更新
     setInterval(fetchData, 1000);
     setInterval(updateInputLog, 10000);
