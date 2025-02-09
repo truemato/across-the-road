@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>細道</title>
   <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
   <!-- 環境変数から Google Maps API Key を挿入 -->
-    <script
+  <script
     src="https://maps.googleapis.com/maps/api/js?key=<%= googleMapsApiKey %>&callback=initMap&v=weekly&libraries=marker"
     async defer></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -19,9 +20,9 @@
       );
       return res.map((line) => line.join('')).join('\n');
     }
-    </script>
-    
-    <style>
+  </script>
+
+  <style>
     .haiku-vertical {
       writing-mode: vertical-rl;
       text-orientation: upright;
@@ -29,24 +30,24 @@
       margin-left: auto;
       margin-right: auto;
     }
-    
+
     /* スマートフォン向けのスタイル */
     @media screen and (max-width: 768px) {
       .log-entry {
         position: relative;
       }
-      
+
       .haiku-comment {
         writing-mode: vertical-rl;
         text-orientation: upright;
         white-space: pre;
         margin: 10px auto;
-        line-height: 1.5em; /* インラインブロック要素として表示 */
+        line-height: 1.5em;
+        /* インラインブロック要素として表示 */
       }
     }
-    </style>
+  </style>
   <style>
-
     body {
       margin: 0;
       padding: 0;
@@ -54,33 +55,41 @@
       height: 100vh;
       overflow: hidden;
     }
+
     #port-selector {
-            position: fixed;
-            right: 10px;
-            bottom: 10px;
-            background: white;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
-        }
-        select, button {
-            margin-top: 5px;
-            width: 100%;
-        }
-        #status {
-            margin-top: 10px;
-            font-size: 14px;
-        }
+      position: fixed;
+      right: 10px;
+      bottom: 10px;
+      background: white;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    select,
+    button {
+      margin-top: 5px;
+      width: 100%;
+    }
+
+    #status {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
     #threejs-container {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      z-index: 3; /* 地図より背面に配置 */
-      pointer-events: none; /* Three.jsが地図操作を邪魔しない */
+      z-index: 3;
+      /* 地図より背面に配置 */
+      pointer-events: none;
+      /* Three.jsが地図操作を邪魔しない */
     }
+
     #street-view {
       position: absolute;
       top: 0;
@@ -89,6 +98,7 @@
       height: 100vh;
       z-index: 1;
     }
+
     #map {
       position: absolute;
       left: 20px;
@@ -100,8 +110,9 @@
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
+
     #current-log {
-	position: absolute;
+      position: absolute;
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
@@ -111,6 +122,7 @@
       z-index: 2;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
+
     #input-log {
       position: absolute;
       right: 20px;
@@ -124,34 +136,40 @@
       z-index: 1;
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     }
+
     a {
       color: gray;
       text-decoration: none;
       border-bottom: 1px dotted gray;
     }
+
     a:visited {
       color: gray;
       border-bottom: 1px dotted gray;
     }
+
     a:hover {
       color: gray;
       border-bottom: 1px dotted gray;
     }
+
     a:active {
       color: gray;
       border-bottom: 1px dotted gray;
     }
   </style>
 </head>
-	<body>
+
+<body>
   <div id="street-view"></div>
   <div id="map"></div>
   <div id="current-log">Loading...</div>
-  <div id="sensor-log" style="position: absolute; top: 20px; right: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);">
+  <div id="sensor-log"
+    style="position: absolute; top: 20px; right: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);">
     Loading...
   </div>
   <div id="input-log"></div>
-    <div id="threejs-container"></div>
+  <div id="threejs-container"></div>
 
   <script>
     // Three.js 初期化
@@ -180,12 +198,12 @@
     }
     group.rotation.z = Math.PI / 2;
 
-	group.scale.set(1.5, 1.5, 1.5);
+    group.scale.set(1.5, 1.5, 1.5);
     scene.add(group);
 
-	// カメラ位置と向きを調整 (左後ろから見下ろすイメージ)
-	camera.position.set(10, 15, 35);
-	camera.lookAt(group.position);
+    // カメラ位置と向きを調整 (左後ろから見下ろすイメージ)
+    camera.position.set(10, 15, 35);
+    camera.lookAt(group.position);
 
     let currentValue = 0;
     let currentLat = 34.9862105;
@@ -204,14 +222,14 @@
         currentLat = latestPlace.lat;
         currentLng = latestPlace.lng;
         console.log("最新の位置情報:", currentLat, currentLng);
-		} catch (error) {
+      } catch (error) {
         console.error("最新位置の取得に失敗しました:", error);
         // 失敗した場合はフェールバックの初期値がそのまま使用されます
       }
     }
     function animate() {
       requestAnimationFrame(animate);
-      group.rotation.x -= currentValue * 3.3; // valueの値に基づいて回転
+      group.rotation.x -= currentValue * 5; // valueの値に基づいて回転
       renderer.render(scene, camera);
     }
     animate();
@@ -258,8 +276,7 @@
         });
       });
     }
-        // updatePegman: computedPos を基に Roads API でスナップし、さらに有効なパノラマがあれば更新
-    // ============================
+    // updatePegman: computedPos を基に Roads API でスナップし、さらに有効なパノラマがあれば更新
     async function updatePegman(computedPos) {
       try {
         const apiKey = "<%= googleMapsApiKey %>";
@@ -322,60 +339,60 @@
     }
     // データの定期更新
     async function fetchData() {
-  try {
-    const response = await fetch("/api/sensorvalue");
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    const data = await response.json();
+      try {
+        const response = await fetch("/api/sensorvalue");
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
 
-    if (data && data.length > 0) {
-      const latestData = data[0];
-      currentValue = latestData.value;
-      outputRpm = currentValue;
-      currentLat = latestData.lat;
-      currentLng = latestData.lng;
-      updateCount = latestData.updateCount;
-      totalDistance = latestData.totalDistance;
+        if (data && data.length > 0) {
+          const latestData = data[0];
+          currentValue = latestData.value;
+          outputRpm = currentValue;
+          currentLat = latestData.lat;
+          currentLng = latestData.lng;
+          updateCount = latestData.updateCount;
+          totalDistance = latestData.totalDistance;
 
-      const newPosition = { lat: currentLat, lng: currentLng };
-      map.setCenter(newPosition);
-      marker.position = newPosition;
+          const newPosition = { lat: currentLat, lng: currentLng };
+          map.setCenter(newPosition);
+          marker.position = newPosition;
 
-      document.getElementById("current-log").textContent =
-        `RPM: ${ outputRpm } 走行距離: ${ (totalDistance / 100).toFixed(2) } m`;
+          document.getElementById("current-log").textContent =
+            `${(totalDistance / 100).toFixed(2)} m`;
 
-      // Pegman更新
-      const newPegmanPos = await updatePegman(newPosition);
-      
-      // ★ ここで ensureStreetView を呼ぶ（新しいPegman座標が確定した後）
-      await ensureStreetView(newPegmanPos.lat, newPegmanPos.lng);
+          // Pegman更新
+          const newPegmanPos = await updatePegman(newPosition);
+
+          // ★ ここで ensureStreetView を呼ぶ（新しいPegman座標が確定した後）
+          await ensureStreetView(newPegmanPos.lat, newPegmanPos.lng);
+        }
+      } catch (error) {
+        console.error("Error fetching sensor data:", error);
+      }
     }
-  } catch (error) {
-    console.error("Error fetching sensor data:", error);
-  }
-}
 
     // 入力履歴の更新
     async function updateInputLog() {
-  try {
-    const response = await fetch("/api/haikuplace");
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const entries = await response.json();
-    const isMobile = window.innerWidth <= 768;
+      try {
+        const response = await fetch("/api/haikuplace");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const entries = await response.json();
+        const isMobile = window.innerWidth <= 768;
 
-    const inputLog = document.getElementById("input-log");
-    inputLog.innerHTML = entries
-      .map((entry) => {
-        const displayPlace = entry.placename || "場所不明";
-        const linkUrl = `https://www.google.com/maps/search/?api=1&query=${entry.lat},${entry.lng}`;
-        
-        // スマートフォンの場合は俳句を縦書きに変換
-        const commentText = isMobile ? 
-          `<div class="haiku-comment">${entry.comment}</div>` :
-          `<div>${entry.comment}</div>`;
+        const inputLog = document.getElementById("input-log");
+        inputLog.innerHTML = entries
+          .map((entry) => {
+            const displayPlace = entry.placename || "場所不明";
+            const linkUrl = `https://www.google.com/maps/search/?api=1&query=${entry.lat},${entry.lng}`;
 
-        return `
+            // スマートフォンの場合は俳句を縦書きに変換
+            const commentText = isMobile ?
+              `<div class="haiku-comment">${entry.comment}</div>` :
+              `<div>${entry.comment}</div>`;
+
+            return `
           <div class="log-entry" style="margin-bottom: 15px; padding: 10px; background: rgba(255, 255, 255, 0.8); border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <div style="font-size: 0.8em; color: #999; margin-bottom: 5px;">
               ${new Date(entry.timestamp).toLocaleString()}
@@ -386,15 +403,15 @@
             </div>
           </div>
         `;
-      })
-      .join("");
-  } catch (error) {
-    console.error("Error updating input log:", error);
-  }
-}
+          })
+          .join("");
+      } catch (error) {
+        console.error("Error updating input log:", error);
+      }
+    }
 
-// ウィンドウサイズが変更されたときにも更新
-window.addEventListener('resize', updateInputLog);
+    // ウィンドウサイズが変更されたときにも更新
+    window.addEventListener('resize', updateInputLog);
     // 定期的なデータ更新
     setInterval(fetchData, 1000);
     setInterval(updateInputLog, 10000);
