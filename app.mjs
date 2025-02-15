@@ -6,6 +6,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { HaikuPlace } from './models/haikuplace.mjs';
 import { SensorValue } from './models/sensorvalue.mjs';
+import { LastPlace } from './models/lastplace.mjs';
 
 dotenv.config();
 
@@ -50,6 +51,19 @@ app.get('/api/sensorvalue', async (req, res) => {
     res.json(sensorData);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+// LastPlace 取得・登録
+app.get('/api/lastplace', async (req, res) => {
+  try {
+    const latestPlace = await LastPlace.findOne().sort({ timestamp: -1 }).limit(1);
+    if (!latestPlace) {
+      res.status(404).json({ message: 'No data found' });
+    } else {
+      res.json(latestPlace);
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
